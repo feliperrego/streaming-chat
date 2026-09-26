@@ -1,5 +1,15 @@
 import { simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
+import { MOCK_FIRST_TOKEN_DELAY_MS } from "@/lib/chat/config";
+import {
+  ERROR_CHUNKS,
+  MOCK_ERROR_MESSAGE,
+  MOCK_SCENARIO_TIMING,
+  SLOW_CHUNKS,
+  selectScenario,
+  type MockScenarioName,
+  type MockTiming,
+} from "./mock-scenarios";
 
 type MockStreamResult = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>;
 
@@ -31,7 +41,7 @@ export function toWordChunks(text: string): string[] {
   return text.match(/\S+\s*/g) ?? [];
 }
 
-export function buildStreamParts(chunks: string[]): MockStreamPart[] {
+export function buildStreamParts(chunks: readonly string[]): MockStreamPart[] {
   const id = "text-1";
   return [
     { type: "text-start", id },
@@ -49,13 +59,61 @@ export function buildStreamParts(chunks: string[]): MockStreamPart[] {
 }
 
 /**
- * A deterministic model for CI, local runs without a key, and tests.
- * Projects that need per-request behaviour choose it inside doStream(options)
- * by reading options.prompt, so getModel() never takes arguments (spec §5.2).
+ * Text deltas followed by a V4 `error` stream part. streamText turns that part
+ * into a UI `error` chunk (errorText from the route's onError). A stream that
+ * throws instead (controller.error) would abort the HTTP body with no `error`
+ * chunk, so the mock uses the stream part.
  */
-export function createMockModel(options: MockModelOptions = {}): MockLanguageModelV4 {
+export function buildErrorStreamParts(chunks: readonly string[]): MockStreamPart[] {
+  const id = "text-1";
+  return [
+    { type: "text-start", id },
+    ...chunks.map((delta): MockStreamPart => ({ type: "text-delta", id, delta })),
+    { type: "error", error: new Error(MOCK_ERROR_MESSAGE) },
+  ];
+}
+
+export function scenarioStreamParts(scenario: MockScenarioName): MockStreamPart[] {
+  switch (scenario) {
+    case "slow":
+      return buildStreamParts(SLOW_CHUNKS);
+    case "error":
+      return buildErrorStreamParts(ERROR_CHUNKS);
+    default:
+      return buildStreamParts(toWordChunks(DEFAULT_MOCK_TEXT));
+  }
+}
+
+/**
+ * The mock that getModel() returns in mock mode: every doStream call picks
+ * default, [[slow]] or [[error]] from the last user message (spec §3.2).
+ * Tests may pass a faster timing; the scenario choice stays the same.
+ */
+export function createScenarioMockModel(
+  timing: MockTiming = MOCK_SCENARIO_TIMING,
+): MockLanguageModelV4 {
+  return new MockLanguageModelV4({
+    doStream: async ({ prompt }) => ({
+      stream: simulateReadableStream({
+        chunks: scenarioStreamParts(selectScenario(prompt)),
+        initialDelayInMs: timing.initialDelayInMs,
+        chunkDelayInMs: timing.chunkDelayInMs,
+      }),
+    }),
+  });
+}
+
+/**
+ * A deterministic model for CI, local runs without a key, and tests.
+ * Without options (how lib/ai/model.ts calls it) it picks a scenario per
+ * request from the prompt, so getModel() never takes arguments (template
+ * spec §5.2). With options, every call streams the same fixed chunks.
+ */
+export function createMockModel(options?: MockModelOptions): MockLanguageModelV4 {
+  if (options === undefined) return createScenarioMockModel();
+
   const {
-    initialDelayInMs = 600,
+    initialDelayInMs = MOCK_FIRST_TOKEN_DELAY_MS,
     chunkDelayInMs = 30,
     chunks = toWordChunks(DEFAULT_MOCK_TEXT),
   } = options;
