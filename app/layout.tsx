@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 
 // Each project sets its own title and description (spec §9).
 export const metadata: Metadata = {
-  title: "AI Portfolio Template",
-  description: "Starter for small AI portfolio projects by Felipe Rêgo.",
+  title: "Streaming Chat",
+  description:
+    "A hand-built streaming chat with Stop, Regenerate and a live time-to-first-token caption, by Felipe Rêgo.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

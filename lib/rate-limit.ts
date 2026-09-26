@@ -25,7 +25,7 @@ export const RATE_LIMIT_ENABLED = Boolean(redisUrl && redisToken);
 
 // Each project sets its own prefix (spec §9) so demos sharing one Upstash
 // database keep separate counters.
-export const RATE_LIMIT_PREFIX = "ai-portfolio-template";
+export const RATE_LIMIT_PREFIX = "streaming-chat";
 
 const limiter = RATE_LIMIT_ENABLED
   ? new Ratelimit({

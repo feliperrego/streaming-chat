@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("placeholder page shows the mock model and the footer", async ({ page }) => {
+test("page shows the mock model and the footer", async ({ page }) => {
   await page.goto("/");
   const header = page.locator("header[data-model]");
   await expect(header).toHaveAttribute("data-model", "mock");
