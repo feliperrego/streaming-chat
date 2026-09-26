@@ -4788,6 +4788,8 @@ Stop here until he answers yes.
 
 - [ ] **Step 2: Scan for secrets**
 
+- Run `git branch --show-current`; it must print `main`. The work must be merged into `main` first (finishing-a-development-branch), otherwise GitHub makes the feature branch the default branch and CI (which runs on pushes to `main`) never starts.
+
 Run `git ls-files | grep -iE "\.env|secret|\.pem|\.vercel"`.
 Expected: only `.env.example`.
 

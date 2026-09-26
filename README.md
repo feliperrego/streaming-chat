@@ -11,8 +11,8 @@ Chat interfaces feel slow when the answer appears only at the end, and they wast
 
 ## How it's measured
 Pending: the first production run prints this line (n, min/max, model, location, date, link to the raw data).
-From the click to the first character of a new answer on screen, via `MEASURE_URL=<url> MEASURE_LOCATION='<city, connection>' pnpm exec playwright test --project=measure`.
-CI calibrates the instrument against a mock with a fixed 600 ms first token (must read 600–2000 ms); Stop is verified to cancel the model call ([spec §9](docs/specs/2026-09-25-streaming-chat-design.md)).
+From the click to the first character of a new answer rendered, via `MEASURE_URL=<url> MEASURE_LOCATION='<city, connection>' pnpm exec playwright test --project=measure`.
+CI calibrates the instrument against a mock with a fixed 600 ms first token (must read 600 ms to under 2000 ms); a route test proves Stop aborts the model call, and the production check is pending ([spec §9](docs/specs/2026-09-25-streaming-chat-design.md#9-manual-checks-in-production-once-before-publishing)).
 Caveats: one client location, n = 14 is a snapshot not a benchmark, headless desktop Chromium, single-turn chats, a whole-stack number not comparable with provider-advertised TTFT.
 
 ## Run it

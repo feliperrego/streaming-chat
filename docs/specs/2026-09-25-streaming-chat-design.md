@@ -325,7 +325,7 @@ One module, shared by client and server, holds:
 TTFT is the time in milliseconds from `performance.now()`, taken just before `sendMessage()` or `regenerate()`, to the first React commit in which a **new** assistant message contains at least 1 text character. A new message is one whose id was absent when the request was sent.
 
 - **It includes** the whole visitor path:
-  - network and TLS on a cold connection
+  - network (the request reuses the connection the page load opened, so TLS setup is not included)
   - function invocation
   - the Upstash check
   - validation
@@ -565,9 +565,9 @@ Record each result here, dated, once it is done. The README links to this sectio
    - The keyboard must not hide the composer.
    - `h-dvh` and the safe area must behave.
    - There must be no horizontal scroll.
-   - Trigger: if the keyboard covers the composer, add `export const viewport = { interactiveWidget: 'resizes-content', viewportFit: 'cover' }` [F: v7 check pass, Next.js viewport docs].
+   - Trigger: if the keyboard covers the composer, add `export const viewport = { interactiveWidget: 'resizes-content', viewportFit: 'cover' }` [F: v7 check pass, Next.js viewport docs]. If that trigger fires, also move the safe-area bottom padding from the composer to the footer, which is the last element.
 4. **Measurement run** (section 5.2), in its own rate-limit hour. Commit the JSON and the README lines together.
-5. **Rate limit** (template §9, step 7). In a fresh hour that is not check 4's hour, POST 21 requests to `/api/chat` from one IP (a curl loop is fine). The 21st returns 429 with the demo-limit text and `Retry-After`.
+5. **Rate limit** (template §9, step 7). In a fresh hour that is not check 4's hour, POST 21 requests to `/api/chat` with `-H 'Content-Type: application/json'` from one IP (a curl loop is fine). The 21st returns 429 with the demo-limit text and `Retry-After`.
 
 ## 10. Out of scope
 
@@ -675,7 +675,7 @@ Before writing the implementation plan, a throwaway prototype of this spec was b
 |---|---|---|
 | A-09 | `validateAndClean` also rejects a history with no user message; it rebuilds every message as `{ id, role, parts: [one text part] }`, dropping metadata and provider metadata a forged body could smuggle through; character limits count all text parts of a message | 3.3 |
 | A-10 | `annotateFinish` returns `id: null` when the message is not in `messages`; `describeChatError` uses `APICallError.isInstance(error) && error.statusCode === 429` | 3.5 |
-| A-11 | Autoscroll is direction-aware: it stops only on an upward scroll landing more than 80 px from the bottom, and resumes only on a downward scroll within 80 px, or when the content no longer overflows. A `MutationObserver` keeps it pinned during streaming. Scroll-up keys are ignored in any input, not only the composer | 2.2 |
+| A-11 | Autoscroll: following stops at once on an upward wheel, a touch-move that scrolls the content up, or PageUp/ArrowUp/Home outside any text field — but only while the content overflows. A scroll event stops it only when it moves up and lands more than 80 px from the bottom. It resumes on a downward scroll landing within 80 px, when the content no longer overflows, or on send/Regenerate/Retry/Jump. A MutationObserver keeps it pinned while streaming. | 2.2 |
 | A-12 | `useTtft` keeps samples in a small external store read with `useSyncExternalStore`, and observes on commits that change messages or status | 3.6 |
 | A-13 | Wording and markup: headline "Watch an answer stream in"; placeholder "Send a message"; the status region announces "Response failed" for both banners and for `interrupted`; `SAFE_ERROR_MESSAGE` "The model could not finish this response. Please try again."; 400 texts start with "Invalid request:"; icon-only Send/Stop buttons (aria-labels "Send message" / "Stop generating"); the error banner sits between the conversation and the composer; `data-message-role`, `data-testid="typing-indicator"` and `data-testid="stopped-row"` for tests | 2 |
 | A-14 | UI guards: a double click on Send never stops the request it just started; Esc ignores keydown while an IME composition is active; the composer is autofocused on desktop only; New chat also clears the error banner and refocuses the composer; Regenerate and Retry also resume autoscroll | 2.2 |
