@@ -82,6 +82,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     scrollToBottom();
     ttft.start(messages);
     void sendMessage({ text });
+    focusUnlessTouch(inputRef.current);
     return true;
   };
 
@@ -93,6 +94,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     scrollToBottom();
     ttft.start(messages);
     void regenerate();
+    focusUnlessTouch(inputRef.current);
   };
 
   const handleStop = useCallback(() => {

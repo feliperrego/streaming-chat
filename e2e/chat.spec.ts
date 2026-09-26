@@ -153,6 +153,8 @@ test.describe("1. calibration and streaming", () => {
   test("a suggested prompt streams in, with a first token in [600, 2000) ms", async ({ page }) => {
     await page.goto("/");
     await promptButton(page, 0).click();
+    // Sending refocuses the composer on a fine pointer, so typing the next message needs no click.
+    await expect(composer(page)).toBeFocused();
     await expect(typingDots(page)).toBeVisible();
 
     const bubble = assistantBubbles(page);
@@ -262,6 +264,8 @@ test("4. Regenerate re-sends only the user turn and shows one answer with a fres
 
   const posted = page.waitForRequest(isChatPost);
   await regenerateButtons(page).click();
+  // Regenerate refocuses the composer on a fine pointer, same as sending.
+  await expect(composer(page)).toBeFocused();
   const body = (await posted).postDataJSON() as ChatRequestBody;
   expect(body.trigger).toBe("regenerate-message");
   // The body ends with the user message and carries no assistant turn or text.
@@ -340,6 +344,25 @@ test.describe("5. autoscroll", () => {
     await expect(stopButton(page)).toBeVisible();
     await stopButton(page).click();
   });
+
+  test("wheel up over a conversation that does not overflow never shows Jump to latest", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await sendText(page, "Hello");
+    await waitUntilIdle(page);
+    expect((await scrollState(page)).overflow).toBeLessThanOrEqual(0);
+
+    const box = await scroller(page).boundingBox();
+    if (box === null) throw new Error("The scroll container is not visible.");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.wheel(0, -300);
+    // Give a buggy handler time to flip isFollowing and re-render before asserting
+    // absence — otherwise a false pass could slip through before React re-renders.
+    await page.waitForTimeout(300);
+
+    await expect(jumpButton(page)).toHaveCount(0);
+  });
 });
 
 test.describe("6. errors", () => {
@@ -413,6 +436,9 @@ test.describe("6. errors", () => {
     await expect(banner(page)).toContainText(GENERIC_ERROR_TEXT);
     const bubble = assistantBubbles(page);
     await expect(answerText(bubble)).toHaveText("This answer fails");
+    // Spec §14 A-15: both Regenerate (under the partial answer) and the banner's Retry show at once.
+    await expect(regenerateButtons(page)).toHaveCount(1);
+    await expect(retryButton(page)).toHaveCount(1);
 
     await retryButton(page).click();
     await ttftOf(bubble);

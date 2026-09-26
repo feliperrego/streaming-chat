@@ -35,9 +35,11 @@ function isTextEntry(target: EventTarget | null): boolean {
 /**
  * Autoscroll for a streaming chat (spec §2.2). While following, a ResizeObserver keeps the
  * view pinned to the bottom with instant scrolls. Following stops at once on an upward wheel,
- * a touch-move that scrolls the content up, PageUp/ArrowUp/Home outside a text field, or a
- * scroll up that lands more than the threshold from the bottom. It resumes on a scroll down
- * that lands within the threshold, when the content stops overflowing, or on scrollToBottom().
+ * a touch-move that scrolls the content up, or PageUp/ArrowUp/Home outside a text field — but
+ * only while the content overflows, since with nothing to scroll there is nothing to jump to.
+ * A scroll up that lands more than the threshold from the bottom always stops it. It resumes
+ * on a scroll down that lands within the threshold, when the content stops overflowing, or on
+ * scrollToBottom().
  */
 export function useStickToBottom(): StickToBottom {
   // Callback refs stored in state, so the effects re-run if either element remounts.
@@ -57,8 +59,11 @@ export function useStickToBottom(): StickToBottom {
     let lastScrollTop = scrollElement.scrollTop;
     let lastTouchY: number | null = null;
 
+    // With nothing to scroll, no scroll event will ever fire to resume following, so an
+    // upward intent here must not stop it (spec §14 A-11): there is nothing to jump to.
+    const overflows = () => scrollElement.scrollHeight > scrollElement.clientHeight;
     const onWheel = (event: WheelEvent) => {
-      if (event.deltaY < 0) setFollowing(false);
+      if (event.deltaY < 0 && overflows()) setFollowing(false);
     };
     const onTouchStart = (event: TouchEvent) => {
       lastTouchY = event.touches[0]?.clientY ?? null;
@@ -67,7 +72,7 @@ export function useStickToBottom(): StickToBottom {
       const touchY = event.touches[0]?.clientY;
       if (touchY === undefined) return;
       // The finger moving down scrolls the content up.
-      if (lastTouchY !== null && touchY > lastTouchY) setFollowing(false);
+      if (lastTouchY !== null && touchY > lastTouchY && overflows()) setFollowing(false);
       lastTouchY = touchY;
     };
     const onScroll = () => {
@@ -82,7 +87,9 @@ export function useStickToBottom(): StickToBottom {
       else if (!nearBottom && movedUp) setFollowing(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (SCROLL_UP_KEYS.has(event.key) && !isTextEntry(event.target)) setFollowing(false);
+      if (SCROLL_UP_KEYS.has(event.key) && !isTextEntry(event.target) && overflows()) {
+        setFollowing(false);
+      }
     };
 
     scrollElement.addEventListener("wheel", onWheel, { passive: true });
