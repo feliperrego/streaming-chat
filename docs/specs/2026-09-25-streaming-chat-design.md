@@ -653,3 +653,36 @@ These are mostly software choices, where my proposals err less than on domain ru
 | C-17 | `[[error]]` fails only on the first sight of a prompt, so Retry succeeds | 3.2 |
 
 Reply in the form "todas ok exceto C-04 e C-09".
+
+## 14. Amendments from the prototype (2026-09-26)
+
+Before writing the implementation plan, a throwaway prototype of this spec was built and verified: lint, typecheck, 163 unit and route tests, build, and 22 e2e tests green in three consecutive CI-mode runs. The prototype showed that some statements above were wrong or incomplete. They are corrected here instead of being silently rewritten above (CLAUDE.md rule 6). Where an amendment conflicts with the text above, the amendment wins.
+
+**Facts that correct the text above** `[F]`:
+
+- **A-01 (§3.2).** The `[[error]]` fallback — a hand-written `ReadableStream` that calls `controller.error` — does **not** work. The HTTP body errors right after the `start` chunk, with no SSE `error` chunk and no `[DONE]`. The mock uses the V4 stream part `{ type: "error", error }` instead, which produces a proper `error` chunk. [F: ai@7.0.114, prototype experiment]
+- **A-02 (§3.3).** `safeValidateUIMessages` is async, so `validateAndClean` returns a `Promise`. It is still pure. [F: ai@7.0.114 `dist/index.d.ts`]
+- **A-03 (§3.5).** When Stop lands before `text-start`, the `onFinish` message that was never pushed has `parts: []` **or** `[{ type: "step-start" }]`. [F: @ai-sdk/react 4.0.117 source]
+- **A-04 (§3.5, §6).** A `firstChunkMs` timeout is armed only after the provider responds (`doStream` resolves). The time spent before the provider's response headers, including the SDK's retry backoff, is bounded only by `maxDuration` (60 s). When `maxDuration` kills the function, nothing can write an `abort` chunk; the client instead sees a broken connection, which `useChat` reports as `status: "error"`, and the generic banner shows. On Vercel this path is UNVERIFIED. [F: ai@7.0.114 `stream-text` source]
+- **A-05 (§4 step 2).** The POST body carries no `messageId` in this app, because it is `undefined`. [F]
+- **A-06 (§5.1).** The "effect before or after paint" question is settled: `useChat` state comes through `useSyncExternalStore` (SyncLane), so the observing effect runs before paint. Drop the ±1 frame caveat. [F: @ai-sdk/react 4.0.117, react-dom 19.2.8]
+- **A-07 (§3.1).** `streamText` logs errors with `console.error` by default. The route passes `onError: () => {}` to `streamText`, so each raw error is logged exactly once, by `toSafeErrorMessage`. A test pins this. [F]
+- **A-08 (§8.3 test 3).** Playwright's `getByRole("alert")` already matches Next's route announcer on an empty page. The e2e suite therefore locates banners with `[data-slot="alert"]`. [F: Next 16.3.6]
+
+**Proposals made while prototyping** `[P]`:
+
+| ID | Proposal | Section |
+|---|---|---|
+| A-09 | `validateAndClean` also rejects a history with no user message; it rebuilds every message as `{ id, role, parts: [one text part] }`, dropping metadata and provider metadata a forged body could smuggle through; character limits count all text parts of a message | 3.3 |
+| A-10 | `annotateFinish` returns `id: null` when the message is not in `messages`; `describeChatError` uses `APICallError.isInstance(error) && error.statusCode === 429` | 3.5 |
+| A-11 | Autoscroll is direction-aware: it stops only on an upward scroll landing more than 80 px from the bottom, and resumes only on a downward scroll within 80 px, or when the content no longer overflows. A `MutationObserver` keeps it pinned during streaming. Scroll-up keys are ignored in any input, not only the composer | 2.2 |
+| A-12 | `useTtft` keeps samples in a small external store read with `useSyncExternalStore`, and observes on commits that change messages or status | 3.6 |
+| A-13 | Wording and markup: headline "Watch an answer stream in"; placeholder "Send a message"; the status region announces "Response failed" for both banners and for `interrupted`; `SAFE_ERROR_MESSAGE` "The model could not finish this response. Please try again."; 400 texts start with "Invalid request:"; icon-only Send/Stop buttons (aria-labels "Send message" / "Stop generating"); the error banner sits between the conversation and the composer; `data-message-role`, `data-testid="typing-indicator"` and `data-testid="stopped-row"` for tests | 2 |
+| A-14 | UI guards: a double click on Send never stops the request it just started; Esc ignores keydown while an IME composition is active; the composer is autofocused on desktop only; New chat also clears the error banner and refocuses the composer; Regenerate and Retry also resume autoscroll | 2.2 |
+| A-15 | After a mid-stream error, both Regenerate (under the partial answer) and the banner's Retry are visible; both call the same function | 2.2, 2.3 |
+| A-16 | Measurement: an aborted run writes `measurements/ttft-YYYY-MM-DD.aborted.json`; a successful run refuses to overwrite an existing good file for the same day; runs also record the real browser version and OS; any failed sample (not only a 429) aborts the run; `MEASURE_LOCATION` is required | 5.2 |
+| A-17 | Playwright: global `retries: 0`, with a single retry only in the calibration describe; `trace: "retain-on-failure"` | 5.3 |
+| A-18 | Extra files: `tests/helpers/sse.ts` (strict SSE parser for route tests) and `lib/measure/ttft-stats.ts` (unit-tested statistics and README lines); e2e "failure modes" tests for timeout, output limit, New chat while streaming, the 20-message cap and touch devices | 7, 8 |
+| A-19 | The system instructions honour an explicit length request up to about 700 words (an estimate of the 1024-token cap), still in plain text | 2.2 |
+
+Reply in the form "todas ok exceto A-13 e A-15".
