@@ -685,4 +685,4 @@ Before writing the implementation plan, a throwaway prototype of this spec was b
 | A-18 | Extra files: `tests/helpers/sse.ts` (strict SSE parser for route tests) and `lib/measure/ttft-stats.ts` (unit-tested statistics and README lines); e2e "failure modes" tests for timeout, output limit, New chat while streaming, the 20-message cap and touch devices | 7, 8 |
 | A-19 | The system instructions honour an explicit length request up to about 700 words (an estimate of the 1024-token cap), still in plain text | 2.2 |
 
-Reply in the form "todas ok exceto A-13 e A-15".
+Approved by Felipe on 2026-09-26 ("todas ok"), together with the implementation plan. Cite as **D-amend**.
