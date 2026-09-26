@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page, type Request, type Route } from "@playwright/test";
-import { CAP_PLACEHOLDER, COMPOSER_PLACEHOLDER } from "@/components/chat/composer";
+import { COMPOSER_PLACEHOLDER } from "@/components/chat/composer";
 import { FIRST_CHUNK_TIMEOUT_MS, MAX_MESSAGES, MAX_USER_CHARS, SUGGESTED_PROMPTS } from "@/lib/chat/config";
 
 // E2E for spec §8.3: the production build in mock mode (AI_MOCK=1), zero cost.
@@ -11,6 +11,18 @@ const SLOW_PROMPT = "[[slow]]";
 const GENERIC_ERROR_TEXT = "Couldn't get a response. Check your connection and try again.";
 // What rateLimitResponse() sends with the default RATE_LIMIT_PER_HOUR (template §5.3).
 const LIMIT_TEXT = "Demo limit reached: 20 messages per hour. Try again later.";
+// CAP_PLACEHOLDER (components/chat/composer.tsx), re-declared as a literal so a rewording
+// of the constant would fail this test, not just move with it (constraints.md: verbatim).
+const CAP_TEXT = "Conversation limit reached. Start a new chat.";
+// The four approved prompts (spec, constraints.md), re-declared as literals for the same
+// reason. SUGGESTED_PROMPTS is still used to click "prompt i" where the exact wording
+// doesn't matter.
+const APPROVED_PROMPTS = [
+  "200-word story about a lighthouse keeper",
+  "Explain how HTTPS works to a new developer",
+  "5 interview questions for a senior frontend engineer",
+  "Follow-up email after a job interview",
+] as const;
 // The mock's default answer (DEFAULT_MOCK_TEXT in lib/ai/mock.ts), from its first to its last words.
 const FULL_DEFAULT_ANSWER =
   /^Streaming lets an answer appear [\s\S]* keeps every test run predictable\.$/;
@@ -493,8 +505,8 @@ test.describe("7. input and New chat", () => {
         exact: true,
       }),
     ).toBeVisible();
-    for (let index = 0; index < SUGGESTED_PROMPTS.length; index++) {
-      await expect(promptButton(page, index)).toBeVisible();
+    for (const prompt of APPROVED_PROMPTS) {
+      await expect(page.getByRole("button", { name: prompt, exact: true })).toBeVisible();
     }
   });
 });
@@ -619,7 +631,7 @@ test.describe("8. failure modes", () => {
     );
 
     await expect(composer(page)).toBeDisabled();
-    await expect(composer(page)).toHaveAttribute("placeholder", CAP_PLACEHOLDER);
+    await expect(composer(page)).toHaveAttribute("placeholder", CAP_TEXT);
     await expect(sendButton(page)).toBeDisabled();
     // Regenerate still works at the cap: it replaces the last answer, not a new turn.
     await expect(regenerateButtons(page)).toHaveCount(1);
