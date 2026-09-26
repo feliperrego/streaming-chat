@@ -1,26 +1,21 @@
+import { Chat } from "@/components/chat/chat";
 import { Footer } from "@/components/footer";
 import { IS_MOCK, MODEL_LABEL } from "@/lib/ai/model";
+import { RATE_LIMIT_PER_HOUR } from "@/lib/rate-limit";
 
+/**
+ * Server component (spec §3.4): lib/ai/model.ts and lib/rate-limit.ts are
+ * server-only, so their values reach the client chat as props.
+ */
 export default function Home() {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header
-        className="flex items-center gap-2 border-b px-4 py-3"
-        data-model={MODEL_LABEL}
-        data-commit={process.env.VERCEL_GIT_COMMIT_SHA ?? "local"}
-        // Present only in mock mode. Never pass a boolean: React renders false as "false".
-        data-mock={IS_MOCK ? "" : undefined}
-      >
-        <span className="font-medium">{MODEL_LABEL}</span>
-        {IS_MOCK && (
-          <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-            Mock model
-          </span>
-        )}
-      </header>
-      <main className="flex-1 p-4">
-        <p>Replace this page.</p>
-      </main>
+    <div className="flex h-dvh flex-col">
+      <Chat
+        modelLabel={MODEL_LABEL}
+        isMock={IS_MOCK}
+        commit={process.env.VERCEL_GIT_COMMIT_SHA ?? "local"}
+        rateLimitPerHour={RATE_LIMIT_PER_HOUR}
+      />
       <Footer />
     </div>
   );
