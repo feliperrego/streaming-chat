@@ -125,6 +125,14 @@ test("time to first token on the deployed demo", async ({ browser, baseURL }, te
   if (baseURL === undefined) throw new Error("Set MEASURE_URL to the deployed URL.");
 
   const date = new Date().toISOString();
+  // Computed from the run's start date, before spending any of the 20/hour quota: a
+  // successful run for today would refuse to write anyway, so fail fast instead of
+  // running 15 requests that can never be saved. An aborted run's file is always
+  // safe (it is time-stamped), so only the success path needs checking here.
+  const successPath = measurementPath({ date, aborted: false });
+  const successFile = path.resolve(testInfo.project.testDir, "..", successPath);
+  assertSafeToWrite(successPath, false, existsSync(successFile));
+
   const deployed = await readDeployment(browser);
   const meta: MeasurementMeta = {
     date,

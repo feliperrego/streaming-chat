@@ -86,9 +86,12 @@ describe("measurementDay and measurementPath", () => {
     expect(() => measurementDay("02/10/2026")).toThrow(RangeError);
   });
 
-  it("names an aborted run's file distinctly, so it never collides with a good run", () => {
+  it("names an aborted run's file with the run's start time, so two aborted runs on the same day never collide", () => {
     expect(measurementPath({ date: "2026-10-02T00:00:00.000Z", aborted: true })).toBe(
-      "measurements/ttft-2026-10-02.aborted.json",
+      "measurements/ttft-2026-10-02-000000.aborted.json",
+    );
+    expect(measurementPath({ date: "2026-10-02T14:03:59.123Z", aborted: true })).toBe(
+      "measurements/ttft-2026-10-02-140359.aborted.json",
     );
   });
 });

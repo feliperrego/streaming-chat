@@ -89,15 +89,17 @@ export function measurementDay(isoDate: string): string {
 
 /**
  * Repo-relative path of the run's JSON. A successful run writes to
- * measurements/ttft-YYYY-MM-DD.json; an aborted run writes to a distinct
- * `.aborted.json` file, so an aborted run can never collide with — or overwrite —
- * a good run's file for the same day (spec §5.4).
+ * measurements/ttft-YYYY-MM-DD.json. An aborted run writes to a distinct,
+ * time-stamped `.aborted.json` file (the run's start time, UTC, as HHMMSS), so
+ * two aborted runs on the same day never overwrite each other, and an aborted
+ * run can never collide with — or overwrite — a good run's file for the same
+ * day (spec §5.4).
  */
 export function measurementPath(measurement: Pick<TtftMeasurement, "date" | "aborted">): string {
   const day = measurementDay(measurement.date);
-  return measurement.aborted
-    ? `measurements/ttft-${day}.aborted.json`
-    : `measurements/ttft-${day}.json`;
+  if (!measurement.aborted) return `measurements/ttft-${day}.json`;
+  const time = measurement.date.slice(11, 19).replace(/:/g, "");
+  return `measurements/ttft-${day}-${time}.aborted.json`;
 }
 
 /**
