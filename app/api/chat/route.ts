@@ -26,12 +26,31 @@ function badRequest(text: string): Response {
   });
 }
 
+function unsupportedMediaType(text: string): Response {
+  return new Response(text, {
+    status: 415,
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
+}
+
+/** The Content-Type media type, lower-cased and stripped of parameters (e.g. `; charset=utf-8`). */
+function mediaType(req: Request): string {
+  return (req.headers.get("Content-Type") ?? "").split(";", 1)[0].trim().toLowerCase();
+}
+
 export async function POST(req: Request): Promise<Response> {
   // 1. Rate limit, before reading the body.
   const limited = await rateLimit(req);
   if (!limited.ok) return rateLimitResponse(limited);
 
-  // 2. Parse.
+  // 2. Reject non-JSON content types before parsing. A JSON content type forces a
+  // CORS preflight, so this blocks cross-site "simple requests" (e.g. a text/plain
+  // form post) from spending the rate-limit budget.
+  if (mediaType(req) !== "application/json") {
+    return unsupportedMediaType("Invalid request: Content-Type must be application/json.");
+  }
+
+  // 3. Parse.
   let body: unknown;
   try {
     body = await req.json();
@@ -39,11 +58,11 @@ export async function POST(req: Request): Promise<Response> {
     return badRequest("Invalid request: the body must be JSON.");
   }
 
-  // 3. Validate and clean.
+  // 4. Validate and clean.
   const validated = await validateAndClean(body);
   if (!validated.ok) return badRequest(validated.text);
 
-  // 4. Stream.
+  // 5. Stream.
   const result = streamText({
     model: getModel(),
     instructions: SYSTEM_INSTRUCTIONS,
@@ -57,7 +76,7 @@ export async function POST(req: Request): Promise<Response> {
     onError: () => {},
   });
 
-  // 5. Respond with the UI message stream as SSE.
+  // 6. Respond with the UI message stream as SSE.
   return createUIMessageStreamResponse({
     stream: toUIMessageStream({
       stream: result.stream,

@@ -1,4 +1,4 @@
-import { simulateReadableStream } from "ai";
+import { APICallError, simulateReadableStream } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/chat/route";
@@ -203,6 +203,51 @@ describe("POST /api/chat — cancellation", () => {
 });
 
 describe("POST /api/chat — failures", () => {
+  it("returns 415 text/plain for a non-JSON Content-Type, and never reads the body or calls the model", async () => {
+    const model = fastModel(["never"]);
+    h.model = model;
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ id: "chat-1", messages: [user("Hi")], trigger: "submit-message" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(415);
+    expect(res.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
+    expect(await res.text()).toBe("Invalid request: Content-Type must be application/json.");
+    expect(req.bodyUsed).toBe(false);
+    expect(model.doStreamCalls).toHaveLength(0);
+  });
+
+  it("returns 415 when the request has no Content-Type header", async () => {
+    const model = fastModel(["never"]);
+    h.model = model;
+    const req = new Request("http://localhost/api/chat", { method: "POST" });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(415);
+    expect(model.doStreamCalls).toHaveLength(0);
+  });
+
+  it("accepts application/json with parameters such as charset", async () => {
+    const model = fastModel(["ok"]);
+    h.model = model;
+    const req = new Request("http://localhost/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({ id: "chat-1", messages: [user("Hi")], trigger: "submit-message" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    await res.text();
+
+    expect(model.doStreamCalls).toHaveLength(1);
+  });
+
   it("returns 429 before reading the body when the limiter denies, and never calls the model", async () => {
     const model = fastModel(["never"]);
     h.model = model;
@@ -287,6 +332,31 @@ describe("POST /api/chat — failures", () => {
       expect.objectContaining({ message: MOCK_ERROR_MESSAGE }),
     );
     // streamText's own default onError must not also log this error (no duplicate).
+    expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides a raw APICallError when doStream rejects before any chunk, and logs it exactly once", async () => {
+    const rawError = new APICallError({
+      message: "Card ending SECRET-4242 declined",
+      url: "https://api.example.com/v1/chat/completions",
+      requestBodyValues: undefined,
+      statusCode: 402,
+      responseBody: "Card ending SECRET-4242 declined",
+    });
+    h.model = new MockLanguageModelV4({
+      doStream: async () => {
+        throw rawError;
+      },
+    });
+
+    const res = await POST(chatRequest([user("Hi")]));
+    const raw = await res.text();
+    const sse = parseSse(raw);
+
+    expect(sse.done).toBe(true);
+    expect(chunkTypes(sse)).toEqual(["start", "error"]);
+    expect(sse.chunks).toContainEqual({ type: "error", errorText: SAFE_ERROR_MESSAGE });
+    expect(raw).not.toContain("SECRET");
     expect(console.error).toHaveBeenCalledTimes(1);
   });
 
