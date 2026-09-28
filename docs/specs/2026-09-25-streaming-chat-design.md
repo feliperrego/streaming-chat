@@ -588,7 +588,7 @@ Deployment: `https://streaming-chat-rho.vercel.app`, commit `feeaba6`, model `op
    - So in production Stop does not save provider tokens through the AI Gateway [F: AI Gateway logs, 2026-09-28]. Vercel's docs say nothing about this case.
    - Cost per answer is bounded by `MAX_OUTPUT_TOKENS` (1024, at most about US$ 0.0005). Felipe accepted this and asked for it to be documented (§14 A-20).
 2. **Consecutive user turns: pass.** A request with two consecutive user messages ("What is 2 + 2?", "Answer in one short sentence.") answered "2 + 2 = 4." and ended with `finish`.
-3. **Real phone at 375 px: pending**, to be done by Felipe on his phone.
+3. **Real phone at 375 px: pass**, checked by Felipe on his own phone on 2026-09-28. The keyboard does not cover the composer, there is no horizontal scroll, and the touch targets work. The `viewport` trigger did not fire, so the safe-area padding stays on the composer.
 4. **Measurement: done.**
    - Median 1340 ms (n=14, min 1222, max 1582); first request of the run 1090 ms; from Fortaleza, BR over fibre.
    - Raw data: `measurements/ttft-2026-09-28.json`.
