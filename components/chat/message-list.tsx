@@ -1,4 +1,5 @@
 import type { ChatStatus, UIMessage } from "ai";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
 import {
   hasVisibleText,
@@ -7,6 +8,7 @@ import {
   showTypingIndicator,
   type RegenerateSlot,
 } from "@/lib/chat/ui";
+import { format } from "@/lib/i18n/messages";
 
 /** What onFinish recorded for a message id (spec §3.4). */
 export type MessageAnnotation = { stopped: boolean; cutOff: boolean };
@@ -35,13 +37,14 @@ export function MessageList({
   slot,
   onRegenerate,
 }: MessageListProps) {
+  const { t } = useLocale();
   const lastId = messages.at(-1)?.id;
 
   return (
     <div
       ref={contentRef}
       role="log"
-      aria-label="Conversation"
+      aria-label={t.list.label}
       aria-busy={isBusy(status)}
       className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6"
     >
@@ -76,12 +79,12 @@ export function MessageList({
             <div className="whitespace-pre-wrap wrap-anywhere">{messageText(message)}</div>
             {hasMeta && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {ttftMs !== undefined && <span>First token in {ttftMs} ms</span>}
-                {annotation?.stopped && <span>Stopped</span>}
-                {annotation?.cutOff && <span>Cut at demo length limit</span>}
+                {ttftMs !== undefined && <span>{format(t.list.ttft, { n: ttftMs })}</span>}
+                {annotation?.stopped && <span>{t.list.stopped}</span>}
+                {annotation?.cutOff && <span>{t.list.cutOff}</span>}
                 {showRegenerate && (
                   <Button variant="link" size="sm" className={REGENERATE_CLASS} onClick={onRegenerate}>
-                    Regenerate
+                    {t.list.regenerate}
                   </Button>
                 )}
               </div>
@@ -100,9 +103,9 @@ export function MessageList({
 
       {slot === "stopped-row" && (
         <div data-testid="stopped-row" className="text-sm text-muted-foreground">
-          Stopped before a response ·{" "}
+          {t.list.stoppedBefore}{" "}
           <Button variant="link" size="sm" className={REGENERATE_CLASS} onClick={onRegenerate}>
-            Regenerate
+            {t.list.regenerate}
           </Button>
         </div>
       )}

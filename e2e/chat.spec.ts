@@ -11,8 +11,8 @@ const SLOW_PROMPT = "[[slow]]";
 const GENERIC_ERROR_TEXT = "Couldn't get a response. Check your connection and try again.";
 // What rateLimitResponse() sends with the default RATE_LIMIT_PER_HOUR (template §5.3).
 const LIMIT_TEXT = "Demo limit reached: 20 messages per hour. Try again later.";
-// CAP_PLACEHOLDER (components/chat/composer.tsx), re-declared as a literal so a rewording
-// of the constant would fail this test, not just move with it (constraints.md: verbatim).
+// composer.capPlaceholder (lib/i18n/messages.ts), re-declared as a literal so a rewording
+// of the value would fail this test, not just move with it (constraints.md: verbatim).
 const CAP_TEXT = "Conversation limit reached. Start a new chat.";
 // The four approved prompts (spec, constraints.md), re-declared as literals for the same
 // reason. SUGGESTED_PROMPTS is still used to click "prompt i" where the exact wording
@@ -366,20 +366,24 @@ test.describe("5. autoscroll", () => {
 });
 
 test.describe("6. errors", () => {
-  test("429 shows the server's limit text with no Retry; a later send succeeds", async ({
+  test("429 shows the translated limit text with no Retry; a later send succeeds", async ({
     page,
   }) => {
     await page.goto("/");
+    // The banner shows the client's errors.limit text, never the 429 body (delta spec §4.4).
+    // In English that text equals the server's LIMIT_TEXT, so the body here differs from it.
+    const serverBody = "server limit text";
     await page.route("**/api/chat", (route) =>
       route.fulfill({
         status: 429,
         contentType: "text/plain; charset=utf-8",
         headers: { "Retry-After": "3600" },
-        body: LIMIT_TEXT,
+        body: serverBody,
       }),
     );
     await sendText(page, "Hello");
     await expect(banner(page)).toHaveText(LIMIT_TEXT);
+    await expect(banner(page)).not.toContainText(serverBody);
     await expect(banner(page)).toHaveAttribute("role", "alert");
     await expect(retryButton(page)).toHaveCount(0);
 

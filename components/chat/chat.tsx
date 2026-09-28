@@ -7,6 +7,7 @@ import { ChatHeader } from "@/components/chat/chat-header";
 import { Composer } from "@/components/chat/composer";
 import { EmptyState } from "@/components/chat/empty-state";
 import { MessageList, type MessageAnnotation } from "@/components/chat/message-list";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
@@ -20,8 +21,7 @@ import {
   regenerateSlot,
   type ChatErrorKind,
 } from "@/lib/chat/ui";
-
-export const GENERIC_ERROR_TEXT = "Couldn't get a response. Check your connection and try again.";
+import { format } from "@/lib/i18n/messages";
 
 type ChatProps = {
   modelLabel: string;
@@ -42,6 +42,7 @@ function focusUnlessTouch(element: HTMLTextAreaElement | null): void {
 
 /** The streaming chat (spec §3.4): owns useChat and every piece of chat-level state. */
 export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps) {
+  const { locale, t } = useLocale();
   const [annotations, setAnnotations] = useState<ReadonlyMap<string, MessageAnnotation>>(
     () => new Map(),
   );
@@ -135,11 +136,11 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
   const announcement = busy
     ? ""
     : errorKind !== null
-      ? "Response failed"
+      ? t.status.failed
       : stoppedByUser
-        ? "Response stopped"
+        ? t.status.stopped
         : lastMessage?.role === "assistant" && hasVisibleText(lastMessage)
-          ? "Response complete"
+          ? t.status.complete
           : "";
 
   return (
@@ -174,7 +175,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
             onClick={() => scrollToBottom({ smooth: true })}
           >
             <ArrowDown />
-            Jump to latest
+            {t.chat.jump}
           </Button>
         )}
       </main>
@@ -182,16 +183,17 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
       {errorKind !== null && (
         <div className="mx-auto w-full max-w-2xl shrink-0 px-4 pb-2">
           {errorKind === "limit" ? (
-            // Demo limit: the server's text, no Retry.
+            // Demo limit: the client's text in the selected language, not the 429 body; no
+            // Retry (delta spec §4.4).
             <Alert variant="destructive">
-              <AlertDescription>{error?.message}</AlertDescription>
+              <AlertDescription>{format(t.errors.limit, { n: rateLimitPerHour })}</AlertDescription>
             </Alert>
           ) : (
             <Alert variant="destructive">
-              <AlertDescription>{GENERIC_ERROR_TEXT}</AlertDescription>
+              <AlertDescription>{t.errors.generic}</AlertDescription>
               <AlertAction>
                 <Button variant="outline" size="sm" className="pointer-coarse:h-11" onClick={regen}>
-                  Retry
+                  {t.chat.retry}
                 </Button>
               </AlertAction>
             </Alert>
@@ -207,7 +209,9 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
         onStop={handleStop}
       />
 
-      <div role="status" className="sr-only">
+      {/* A language switch remounts the region instead of changing its text, which a screen
+          reader would announce as a new status. */}
+      <div key={locale} role="status" className="sr-only">
         {announcement}
       </div>
     </div>

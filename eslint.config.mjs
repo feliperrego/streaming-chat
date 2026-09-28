@@ -43,6 +43,17 @@ const eslintConfig = defineConfig([
       "no-restricted-syntax": "off",
     },
   },
+  // Interface text comes from lib/i18n/messages.ts (delta spec §4.3, T-18). The rule sees
+  // JSX text only; the Portuguese e2e sweep covers attributes and strings outside JSX.
+  {
+    files: ["components/chat/**", "components/footer.tsx"],
+    rules: {
+      "react/jsx-no-literals": [
+        "error",
+        { allowedStrings: ["Streaming Chat", "EN", "PT", "Felipe Rêgo"] },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

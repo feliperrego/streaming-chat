@@ -1,9 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
+import { messages } from "@/lib/i18n/messages";
 
 // E2E for the interface language (delta spec §6): the production build in mock mode.
 // The page is prerendered in English and switches after hydration (delta spec §4.2), so
 // Portuguese is asserted web-first only, and English only once the page has hydrated.
-// The expected strings are literals, re-declared as in chat.spec.ts.
+// The expected strings are literals, re-declared as in chat.spec.ts. Only the negative
+// sweep of item 2 reads the dictionary, to find every English string.
+
+const SLOW_PROMPT = "[[slow]]";
+// What rateLimitResponse() sends with the default RATE_LIMIT_PER_HOUR, as in chat.spec.ts.
+const LIMIT_TEXT = "Demo limit reached: 20 messages per hour. Try again later.";
 
 // The eight prompts in both languages (delta spec §4.3).
 const DEMO_PROMPTS_EN = [
@@ -42,6 +48,47 @@ const composer = (page: Page) => page.getByRole("textbox");
 const conversation = (page: Page) => page.getByRole("log");
 const userBubbles = (page: Page) => page.locator('[data-message-role="user"]');
 const assistantBubbles = (page: Page) => page.locator('[data-message-role="assistant"]');
+// The error banner. Next.js's route announcer also has role="alert", so the banner is
+// located by its data-slot, as in chat.spec.ts.
+const banner = (page: Page) => page.locator('[data-slot="alert"]');
+// The sr-only live region Chat announces the end of a response through.
+const statusRegion = (page: Page) => page.locator('div[role="status"].sr-only');
+
+async function sendPortuguese(page: Page, text: string): Promise<void> {
+  await composer(page).fill(text);
+  await page.getByRole("button", { name: "Enviar mensagem", exact: true }).click();
+}
+
+/**
+ * The fixed text of every English value that differs from its pt-BR value (delta spec §6,
+ * item 2): the parts between {placeholders} that the pt-BR value does not also contain.
+ * So list.ttft gives "First token in " but not " ms", and a value equal in both gives nothing.
+ */
+function englishOnly(en: unknown, pt: unknown): string[] {
+  if (typeof en === "string" && typeof pt === "string") {
+    return en.split(/\{\w+\}/).filter((fragment) => !pt.includes(fragment));
+  }
+  const ptValues = pt as Record<string, unknown>;
+  return Object.entries(en as Record<string, unknown>).flatMap(([key, value]) =>
+    englishOnly(value, ptValues[key]),
+  );
+}
+
+const ENGLISH_ONLY = englishOnly(messages.en, messages["pt-BR"]);
+
+/** The English-only strings found in the page's text or in any aria-label or placeholder. */
+async function englishLeftovers(page: Page): Promise<string[]> {
+  const texts = await page.evaluate(() => {
+    const attributes = (name: string) =>
+      Array.from(document.querySelectorAll(`[${name}]`), (element) => element.getAttribute(name));
+    return [document.body.innerText, ...attributes("aria-label"), ...attributes("placeholder")];
+  });
+  return ENGLISH_ONLY.filter((fragment) => texts.some((text) => text?.includes(fragment)));
+}
+
+async function expectNoEnglish(page: Page): Promise<void> {
+  await expect.poll(() => englishLeftovers(page)).toEqual([]);
+}
 
 /**
  * Waits until the page has hydrated: Chat focuses the composer from an effect on load
@@ -101,7 +148,7 @@ test("1. / shows the demo group, then the about group, with the 8 English prompt
   ).toBeVisible();
 });
 
-test("2. PT translates the empty state: title, both groups, the 8 prompts and the rate note", async ({
+test("2. PT translates the empty state: title, both groups, the 8 prompts, the rate note and the placeholder", async ({
   page,
 }) => {
   await page.goto("/");
@@ -132,6 +179,56 @@ test("2. PT translates the empty state: title, both groups, the 8 prompts and th
   await expect(
     page.getByText("20 mensagens/hora por visitante; regenerações contam", { exact: true }),
   ).toBeVisible();
+  await expect(composer(page)).toHaveAttribute("placeholder", "Envie uma mensagem");
+});
+
+test("2. PT sweep: no English string on the empty state, after a Stop or under the error banner", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  // Control: in English the sweep finds the dictionary's text, placeholders and aria-labels.
+  await expect
+    .poll(() => englishLeftovers(page))
+    .toEqual(expect.arrayContaining(["Watch an answer stream in", "Send a message", "Language"]));
+
+  await switchButton(page, "PT").click();
+  await expectPortuguese(page);
+  await expectNoEnglish(page);
+
+  // A stopped answer: its captions, Regenerate and the stopped announcement.
+  await sendPortuguese(page, SLOW_PROMPT);
+  const bubble = assistantBubbles(page);
+  await expect(bubble).toHaveCount(1);
+  await page.getByRole("button", { name: "Parar geração", exact: true }).click();
+  await expect(bubble.getByText("Interrompida", { exact: true })).toBeVisible();
+  await expect(bubble.getByText(/^Primeiro token em \d+ ms$/)).toBeVisible();
+  await expect(bubble.getByRole("button", { name: "Gerar novamente", exact: true })).toBeVisible();
+  await expect(statusRegion(page)).toHaveText("Resposta interrompida");
+  await expect(conversation(page)).toHaveAccessibleName("Conversa");
+  await expect(composer(page)).toHaveAccessibleName("Mensagem");
+  await expect(newChatButton(page, "Nova conversa")).toBeVisible();
+  await expect(footer(page)).toContainText("Feito por");
+  await expect(footer(page)).toContainText("Código no GitHub");
+  await expectNoEnglish(page);
+
+  // A failed request: the generic banner, its Retry and the failed announcement.
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: "text/plain; charset=utf-8",
+      body: "Internal Server Error",
+    }),
+  );
+  await sendPortuguese(page, "Olá");
+  await expect(banner(page)).toContainText(
+    "Não foi possível obter uma resposta. Verifique sua conexão e tente de novo.",
+  );
+  await expect(
+    banner(page).getByRole("button", { name: "Tentar de novo", exact: true }),
+  ).toBeVisible();
+  await expect(statusRegion(page)).toHaveText("Falha na resposta");
+  await expectNoEnglish(page);
 });
 
 test("PT translates the header and the footer; EN switches back", async ({ page }) => {
@@ -297,4 +394,58 @@ test("6. ?lang=pt-BR alone is not stored: / in the same context opens in English
   await page.goto("/");
   await waitForHydration(page);
   await expectEnglish(page);
+});
+
+test("7. a 429 in Portuguese shows the pt-BR limit text, not the English body", async ({
+  page,
+}) => {
+  await page.goto("/?lang=pt-BR");
+  await expectPortuguese(page);
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      status: 429,
+      contentType: "text/plain; charset=utf-8",
+      headers: { "Retry-After": "3600" },
+      body: LIMIT_TEXT,
+    }),
+  );
+  await composer(page).fill("Olá");
+  await composer(page).press("Enter");
+  await expect(banner(page)).toHaveText(
+    "Limite da demo atingido: 20 mensagens por hora. Tente mais tarde.",
+  );
+  await expect(page.getByRole("button", { name: "Tentar de novo", exact: true })).toHaveCount(0);
+});
+
+test("the limit banner follows the switch: pt-BR after PT, English again after EN, never Retry", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  // In English the client's text equals LIMIT_TEXT, so the body here differs from it.
+  const serverBody = "server limit text";
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      status: 429,
+      contentType: "text/plain; charset=utf-8",
+      headers: { "Retry-After": "3600" },
+      body: serverBody,
+    }),
+  );
+  await composer(page).fill("Hello");
+  await composer(page).press("Enter");
+  await expect(banner(page)).toHaveText(LIMIT_TEXT);
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+
+  await switchButton(page, "PT").click();
+  await expectPortuguese(page);
+  await expect(banner(page)).toHaveText(
+    "Limite da demo atingido: 20 mensagens por hora. Tente mais tarde.",
+  );
+  await expect(page.getByRole("button", { name: "Tentar de novo", exact: true })).toHaveCount(0);
+
+  await switchButton(page, "EN").click();
+  await expectEnglish(page);
+  await expect(banner(page)).toHaveText(LIMIT_TEXT);
+  await expect(page.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
 });

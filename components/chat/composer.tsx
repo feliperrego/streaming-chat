@@ -1,12 +1,17 @@
 import { ArrowUp, Square } from "lucide-react";
 import { useState, type Ref } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { MAX_USER_CHARS } from "@/lib/chat/config";
 import { shouldSubmitOnKey } from "@/lib/chat/ui";
+import { messages } from "@/lib/i18n/messages";
 
-export const COMPOSER_PLACEHOLDER = "Send a message";
-export const CAP_PLACEHOLDER = "Conversation limit reached. Start a new chat.";
+/**
+ * The English placeholder (delta spec §4.3, T-20). The composer shows the selected
+ * language's; e2e/chat.spec.ts checks this one.
+ */
+export const COMPOSER_PLACEHOLDER = messages.en.composer.placeholder;
 
 type ComposerProps = {
   inputRef: Ref<HTMLTextAreaElement>;
@@ -21,6 +26,7 @@ type ComposerProps = {
 
 /** Textarea plus one button that swaps Send and Stop (spec §2.2). */
 export function Composer({ inputRef, busy, atCap, onSend, onStop }: ComposerProps) {
+  const { t } = useLocale();
   const [value, setValue] = useState("");
 
   const submit = () => {
@@ -32,7 +38,7 @@ export function Composer({ inputRef, busy, atCap, onSend, onStop }: ComposerProp
       <div className="mx-auto flex w-full max-w-2xl items-end gap-2">
         <Textarea
           ref={inputRef}
-          aria-label="Message"
+          aria-label={t.composer.label}
           value={value}
           onChange={(event) => setValue(event.target.value)}
           onKeyDown={(event) => {
@@ -49,14 +55,14 @@ export function Composer({ inputRef, busy, atCap, onSend, onStop }: ComposerProp
           maxLength={MAX_USER_CHARS}
           rows={1}
           disabled={atCap}
-          placeholder={atCap ? CAP_PLACEHOLDER : COMPOSER_PLACEHOLDER}
+          placeholder={atCap ? t.composer.capPlaceholder : t.composer.placeholder}
           className="max-h-40 min-h-11 min-w-0 resize-none"
         />
         {busy ? (
           <Button
             size="icon-lg"
             className="pointer-coarse:size-11"
-            aria-label="Stop generating"
+            aria-label={t.composer.stop}
             onClick={(event) => {
               // The second click of a double-click on Send lands here once the button
               // has swapped; it must not stop the request the first click started.
@@ -70,7 +76,7 @@ export function Composer({ inputRef, busy, atCap, onSend, onStop }: ComposerProp
           <Button
             size="icon-lg"
             className="pointer-coarse:size-11"
-            aria-label="Send message"
+            aria-label={t.composer.send}
             disabled={value.trim() === "" || atCap}
             onClick={submit}
           >
