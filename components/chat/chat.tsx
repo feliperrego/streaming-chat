@@ -67,6 +67,16 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     });
   const ttft = useTtft(messages, status);
   const { scrollRef, contentRef, isFollowing, scrollToBottom } = useStickToBottom();
+  // The hook takes the scroll container through a callback ref; Chat keeps its own handle
+  // so that New chat can scroll back to the top (T-22).
+  const scrollElementRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      scrollElementRef.current = element;
+      scrollRef(element);
+    },
+    [scrollRef],
+  );
 
   const busy = isBusy(status);
   // Send, Enter, Regenerate and Retry act only when the chat is idle.
@@ -82,7 +92,8 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     setInterrupted(false);
     scrollToBottom();
     ttft.start(messages);
-    void sendMessage({ text });
+    // The route adds the interface language to the instructions (delta spec §3.3, T-11).
+    void sendMessage({ text }, { body: { locale } });
     focusUnlessTouch(inputRef.current);
     return true;
   };
@@ -94,7 +105,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     setInterrupted(false);
     scrollToBottom();
     ttft.start(messages);
-    void regenerate();
+    void regenerate({ body: { locale } });
     focusUnlessTouch(inputRef.current);
   };
 
@@ -113,6 +124,9 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     ttft.reset();
     setInterrupted(false);
     setStoppedByUser(false);
+    // The empty state opens at its title, not at the old scroll position (T-22). The list
+    // unmounts in the next commit, which disconnects the observers that pin to the bottom.
+    scrollElementRef.current?.scrollTo({ top: 0, behavior: "instant" });
     focusUnlessTouch(inputRef.current);
   };
 
@@ -153,7 +167,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
       />
 
       <main className="relative min-h-0 flex-1">
-        <div ref={scrollRef} className="h-full overflow-y-auto overscroll-contain">
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto overscroll-contain">
           {messages.length === 0 ? (
             <EmptyState rateLimitPerHour={rateLimitPerHour} onPrompt={send} />
           ) : (

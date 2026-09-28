@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import { messages } from "@/lib/i18n/messages";
 
 // E2E for the interface language (delta spec §6): the production build in mock mode.
@@ -37,6 +37,36 @@ const ABOUT_PROMPTS_PT = [
   "Quem é o Felipe e que vagas ele procura?",
 ] as const;
 
+// What item 9 taps and reads on a phone, in each language (delta spec §4.3).
+type PhoneStrings = {
+  prompts: readonly string[];
+  newChat: string;
+  send: string;
+  stop: string;
+  title: string;
+};
+const PHONE_EN: PhoneStrings = {
+  prompts: [...DEMO_PROMPTS_EN, ...ABOUT_PROMPTS_EN],
+  newChat: "New chat",
+  send: "Send message",
+  stop: "Stop generating",
+  title: "Watch an answer stream in",
+};
+const PHONE_PT: PhoneStrings = {
+  prompts: [...DEMO_PROMPTS_PT, ...ABOUT_PROMPTS_PT],
+  newChat: "Nova conversa",
+  send: "Enviar mensagem",
+  stop: "Parar geração",
+  title: "Veja a resposta chegar em tempo real",
+};
+
+// The fields of a POST /api/chat body that item 8 reads (delta spec §3.3).
+type ChatRequestBody = {
+  messages: { role: string; parts: { type: string; text?: string }[] }[];
+  trigger: string;
+  locale?: unknown;
+};
+
 const header = (page: Page) => page.locator("header[data-model]");
 const footer = (page: Page) => page.locator("footer");
 // exact: a non-exact "EN" also matches "Send message".
@@ -46,6 +76,8 @@ const newChatButton = (page: Page, name: string) =>
   header(page).getByRole("button", { name, exact: true });
 const composer = (page: Page) => page.getByRole("textbox");
 const conversation = (page: Page) => page.getByRole("log");
+// The scroll container is the parent of the role="log" list, as in chat.spec.ts.
+const scroller = (page: Page) => conversation(page).locator("xpath=..");
 const userBubbles = (page: Page) => page.locator('[data-message-role="user"]');
 const assistantBubbles = (page: Page) => page.locator('[data-message-role="assistant"]');
 // The error banner. Next.js's route announcer also has role="alert", so the banner is
@@ -57,6 +89,17 @@ const statusRegion = (page: Page) => page.locator('div[role="status"].sr-only');
 async function sendPortuguese(page: Page, text: string): Promise<void> {
   await composer(page).fill(text);
   await page.getByRole("button", { name: "Enviar mensagem", exact: true }).click();
+}
+
+function isChatPost(request: Request): boolean {
+  return request.method() === "POST" && new URL(request.url()).pathname === "/api/chat";
+}
+
+/** Runs `action` and returns the body of the POST /api/chat it sends. */
+async function postedBody(page: Page, action: () => Promise<void>): Promise<ChatRequestBody> {
+  const posted = page.waitForRequest(isChatPost);
+  await action();
+  return (await posted).postDataJSON() as ChatRequestBody;
 }
 
 /**
@@ -129,6 +172,46 @@ async function expectPromptGroup(
   for (const name of prompts) {
     await expect(group.getByRole("button", { name, exact: true })).toBeVisible();
   }
+}
+
+/**
+ * Item 9 on a phone: the 8 prompts, New chat, EN and PT are at least 44 px tall (base §2.5),
+ * and the page does not scroll sideways. The sizes come from CSS, so they are the same
+ * before and after hydration.
+ */
+async function expectPhoneLayout(page: Page, strings: PhoneStrings): Promise<void> {
+  for (const name of [...strings.prompts, strings.newChat, "EN", "PT"]) {
+    const box = await page.getByRole("button", { name, exact: true }).boundingBox();
+    expect(box?.height, `height of "${name}"`).toBeGreaterThanOrEqual(44);
+  }
+  const widths = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+  }));
+  expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+}
+
+/**
+ * Item 9, T-22: after a conversation more than a view taller than the screen, New chat shows
+ * the empty state from its title. The mock's [[slow]] answer is stopped once it is that tall.
+ */
+async function expectNewChatOpensAtTitle(page: Page, strings: PhoneStrings): Promise<void> {
+  await composer(page).tap();
+  await composer(page).fill(SLOW_PROMPT);
+  await page.getByRole("button", { name: strings.send, exact: true }).tap();
+  // The view follows the stream, so this waits until it is more than a full view down.
+  await expect
+    .poll(() => scroller(page).evaluate((element) => element.scrollTop - element.clientHeight), {
+      timeout: 10_000,
+    })
+    .toBeGreaterThan(0);
+  await page.getByRole("button", { name: strings.stop, exact: true }).tap();
+
+  await newChatButton(page, strings.newChat).tap();
+  await expect(conversation(page)).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { level: 2, name: strings.title, exact: true }),
+  ).toBeInViewport({ ratio: 1 });
 }
 
 test("1. / shows the demo group, then the about group, with the 8 English prompts", async ({
@@ -448,4 +531,88 @@ test("the limit banner follows the switch: pt-BR after PT, English again after E
   await expectEnglish(page);
   await expect(banner(page)).toHaveText(LIMIT_TEXT);
   await expect(page.getByRole("button", { name: "Retry", exact: true })).toHaveCount(0);
+});
+
+test("8. an about prompt posts its exact text and the locale: en, then pt-BR after PT; Regenerate sends pt-BR too", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  // English first: a locale fixed at load, rather than read for each request, fails below.
+  const english = await postedBody(page, () =>
+    page.getByRole("button", { name: ABOUT_PROMPTS_EN[0], exact: true }).click(),
+  );
+  expect(english.locale).toBe("en");
+  await newChatButton(page, "New chat").click();
+
+  await switchButton(page, "PT").click();
+  await expectPortuguese(page);
+  const prompt = ABOUT_PROMPTS_PT[0];
+  const sent = await postedBody(page, () =>
+    page.getByRole("button", { name: prompt, exact: true }).click(),
+  );
+  expect(sent.trigger).toBe("submit-message");
+  expect(sent.messages.at(-1)?.role).toBe("user");
+  expect(sent.messages.at(-1)?.parts).toEqual([{ type: "text", text: prompt }]);
+  expect(sent.locale).toBe("pt-BR");
+
+  // Regenerate shows once the mock's default answer is complete, about 4 s after the send.
+  const regenerate = assistantBubbles(page).getByRole("button", {
+    name: "Gerar novamente",
+    exact: true,
+  });
+  await expect(regenerate).toBeVisible({ timeout: 20_000 });
+  const regenerated = await postedBody(page, () => regenerate.click());
+  expect(regenerated.trigger).toBe("regenerate-message");
+  expect(regenerated.messages.at(-1)?.parts).toEqual([{ type: "text", text: prompt }]);
+  expect(regenerated.locale).toBe("pt-BR");
+});
+
+test("PT while an answer streams renames Stop; the stopped request sent en, its Regenerate sends pt-BR", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  const english = await postedBody(page, async () => {
+    await composer(page).fill(SLOW_PROMPT);
+    await composer(page).press("Enter");
+  });
+  // Sent before the switch.
+  expect(english.locale).toBe("en");
+  // The bubble shows once text has arrived; aria-busy stays true while the answer streams.
+  const bubble = assistantBubbles(page);
+  await expect(bubble).toHaveCount(1);
+  await expect(conversation(page)).toHaveAttribute("aria-busy", "true");
+
+  await switchButton(page, "PT").click();
+  await expectPortuguese(page);
+  await page.getByRole("button", { name: "Parar geração", exact: true }).click();
+  await expect(bubble.getByText("Interrompida", { exact: true })).toBeVisible();
+
+  const regenerated = await postedBody(page, () =>
+    bubble.getByRole("button", { name: "Gerar novamente", exact: true }).click(),
+  );
+  expect(regenerated.trigger).toBe("regenerate-message");
+  expect(regenerated.locale).toBe("pt-BR");
+});
+
+test.describe("9. a phone at 375×812 with touch", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test("9. 44 px targets, no sideways scroll and New chat back at the title, in English and after tapping PT", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const isCoarsePointer = await page.evaluate(
+      () => window.matchMedia("(pointer: coarse)").matches,
+    );
+    expect(isCoarsePointer).toBe(true);
+    await expectPhoneLayout(page, PHONE_EN);
+    await expectNewChatOpensAtTitle(page, PHONE_EN);
+
+    await switchButton(page, "PT").tap();
+    await expectPortuguese(page);
+    await expectPhoneLayout(page, PHONE_PT);
+    await expectNewChatOpensAtTitle(page, PHONE_PT);
+  });
 });
