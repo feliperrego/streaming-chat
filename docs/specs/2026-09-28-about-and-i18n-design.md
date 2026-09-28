@@ -133,6 +133,8 @@ The rules' substance is [D-chat-2]; this wording is [D: T-14]:
 4. **Everything else.** Other questions (the demo prompts, general topics) are answered as before.
 5. **Unchanged.** The existing rules still apply to every answer, including answers about the project and Felipe: plain text and 150–250 words (D-S-01). The profile's dashes are layout only.
 
+In the prompt the rules are plain text: the bold markers above and the "(D-S-01)" citation are spec formatting and are left out [F: plan 2026-09-28, Task 2].
+
 **The interface language** [D: T-11]. Rule 3's fallback needs the model to know the interface language, and today it does not: the route passes a constant, and the default transport posts only `{ id, messages, trigger }` [F: code, 2026-09-28].
 
 - The client sends it with every request: `sendMessage({ text }, { body: { locale } })` and `regenerate({ body: { locale } })` [F: `ChatRequestOptions.body`, ai@7.0.114 `dist/index.d.ts`]. Retry and Regenerate share `regen()`, so both carry it.
@@ -162,7 +164,7 @@ An in-repo dictionary and client-side locale state, with no new dependency [D-ch
 - **`components/i18n/locale-provider.tsx`** (`"use client"`):
   - The locale lives in a small external store read with `useSyncExternalStore`, the pattern of `hooks/use-ttft.ts` (A-12). `getServerSnapshot` returns `"en"`, matching the static prerender. `getSnapshot` resolves the locale once, from `location.search` and `localStorage` (inside try/catch), then returns the cached value.
   - An explicit choice always wins: the one-time resolution runs only while no locale is set, so a click that lands before it is never overwritten.
-  - `setLocale` sets the value, writes `localStorage` (try/catch), removes `lang` from the URL (T-19) and notifies subscribers.
+  - `setLocale` sets the value, writes `localStorage` (try/catch), removes `lang` from the URL (T-19) and notifies subscribers. The URL is changed with `window.history.replaceState(null, "", url)`, the native History API call of the Next.js docs. With `null`, Next keeps its own history state and moves its router to the new URL, with no request and no reload. Passing `history.state` skips that sync, and a later router update puts `?lang=` back [F: prototype, 2026-09-28; e2e test "5. removing lang keeps the page…"].
   - An effect only writes `document.documentElement.lang`. Nothing calls setState inside an effect: `react-hooks/set-state-in-effect` is an error in CI's `pnpm lint` [F: eslint-config-next 16.3.6 with react-hooks 7.1.1, checked 2026-09-28].
   - Exposes `useLocale(): { locale, setLocale, t }`, where `t` is the current dictionary.
 - **`components/chat/language-switch.tsx`** [D: T-21]. Two buttons in a `role="group"` labelled `t.header.language`. Their accessible names are exactly `EN` and `PT`; tests locate them with `exact: true`. The selected one has `aria-pressed="true"`. 44 px tall on coarse pointers (base §2.5). It sits at the right end of the header, after New chat.
@@ -248,8 +250,8 @@ When `describeChatError(error)` returns `"limit"`, the banner shows `format(t.er
 - The demo group comes first, then the about group [D: T-07].
 - Buttons send immediately, as today.
 - On a phone at 375 px the 8 buttons form a single scrolling column, with no horizontal scroll and 44 px targets.
-- With 8 prompts the empty state is likely taller than a 375×812 viewport (estimate, not measured). `newChat()` does not reset the scroll position, so after a long conversation the title could open out of view. Decision [D: T-22]: New chat scrolls the conversation container to the top.
-- **Header at 375 px** [D: T-21]. The Portuguese header, with the mock badge that e2e shows, may overflow (estimate, not measured: about 360 px of fixed-width content in 343 px). Decision: below `sm`, New chat shows only its icon, 44×44 on coarse pointers; its text stays as `sr-only`, so the accessible name `New chat`/`Nova conversa` is kept. The prototype measures both languages.
+- With 8 prompts the empty state is taller than a 375×812 viewport [F: prototype, 2026-09-28: 714 px of content in a 613 px scroll area in English, 780 px in Portuguese; the title is in view on load]. `newChat()` does not reset the scroll position, so after a long conversation the title could open out of view. Decision [D: T-22]: New chat scrolls the conversation container to the top.
+- **Header at 375 px** [D: T-21]. The Portuguese header, with the mock badge that e2e shows, may overflow (an estimate of about 360 px of fixed-width content in 343 px). Decision: below `sm`, New chat shows only its icon, 44×44 on coarse pointers; its text stays as `sr-only`, so the accessible name `New chat`/`Nova conversa` is kept. With this, the header fits at 375 px in both languages, in mock mode and in a production-like build [F: prototype, 2026-09-28].
 
 ## 6. Tests (all zero cost)
 
@@ -293,6 +295,12 @@ The new tests live in `e2e/i18n.spec.ts`. Portuguese assertions are web-first on
    - after the tap, `html[lang]` is `pt-BR` and `PT` has `aria-pressed="true"`;
    - [T-22] after a conversation that overflows, New chat shows the empty-state title inside the viewport.
    - If the Portuguese header overflows, the implementer stops and asks; targets are never shrunk.
+
+**Beyond this list** [F: plan 2026-09-28]:
+- The plan adds three tests for inputs the spec does not spell out: a language switch while an answer streams, blocked storage, and a switch while the limit banner shows.
+- It adds one more for a shared `?lang=` link with a conversation on screen.
+- Test 4 checks both directions.
+- `playwright.config.ts` pins `RATE_LIMIT_PER_HOUR` to 20 for the local e2e build.
 
 **Build check** (the plan's final task): the `pnpm build` output is saved to a file, and `grep -Eq '○ /(\s|$)'` must succeed.
 
