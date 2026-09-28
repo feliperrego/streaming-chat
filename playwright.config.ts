@@ -52,6 +52,10 @@ export default defineConfig({
         env: {
           PORT: String(PORT),
           AI_MOCK: "1",
+          // The e2e literals (delta spec §6) assume the default limit; pinned so a local .env*
+          // value cannot change the page the local run builds. (In CI the build step runs
+          // separately with the workflow env, which sets no limit.)
+          RATE_LIMIT_PER_HOUR: "20",
           UPSTASH_REDIS_REST_URL: "",
           UPSTASH_REDIS_REST_TOKEN: "",
           KV_REST_API_URL: "",

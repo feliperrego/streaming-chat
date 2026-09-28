@@ -1,5 +1,7 @@
+import { useId } from "react";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
-import { SUGGESTED_PROMPTS } from "@/lib/chat/config";
+import { format } from "@/lib/i18n/messages";
 
 type EmptyStateProps = {
   /** RATE_LIMIT_PER_HOUR from lib/rate-limit.ts, so the UI never states a wrong limit. */
@@ -8,18 +10,23 @@ type EmptyStateProps = {
   onPrompt: (text: string) => void;
 };
 
-/** What a new chat shows (spec §2.1, D-S-02). */
-export function EmptyState({ rateLimitPerHour, onPrompt }: EmptyStateProps) {
+type PromptGroupProps = {
+  heading: string;
+  prompts: readonly string[];
+  onPrompt: (text: string) => void;
+};
+
+/** A labelled group of prompt buttons: one column below sm, two from sm up (delta spec §5). */
+function PromptGroup({ heading, prompts, onPrompt }: PromptGroupProps) {
+  const headingId = useId();
+
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-6 px-4 py-8">
-      <div className="space-y-2">
-        <h2 className="text-2xl font-semibold tracking-tight">Watch an answer stream in</h2>
-        <p className="text-muted-foreground">
-          Try it: send a prompt → press Stop (or Esc) halfway → Regenerate
-        </p>
-      </div>
+    <section aria-labelledby={headingId} className="space-y-2">
+      <h3 id={headingId} className="text-sm font-medium">
+        {heading}
+      </h3>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {SUGGESTED_PROMPTS.map((prompt) => (
+        {prompts.map((prompt) => (
           <Button
             key={prompt}
             variant="outline"
@@ -30,8 +37,27 @@ export function EmptyState({ rateLimitPerHour, onPrompt }: EmptyStateProps) {
           </Button>
         ))}
       </div>
+    </section>
+  );
+}
+
+/**
+ * What a new chat shows (spec §2.1, D-S-02), in the selected language: the demo prompts,
+ * then the about prompts (delta spec §5, T-07). A button sends the text it shows.
+ */
+export function EmptyState({ rateLimitPerHour, onPrompt }: EmptyStateProps) {
+  const { t } = useLocale();
+
+  return (
+    <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col justify-center gap-6 px-4 py-8">
+      <div className="space-y-2">
+        <h2 className="text-2xl font-semibold tracking-tight">{t.empty.title}</h2>
+        <p className="text-muted-foreground">{t.empty.tryIt}</p>
+      </div>
+      <PromptGroup heading={t.empty.groupDemo} prompts={t.prompts.demo} onPrompt={onPrompt} />
+      <PromptGroup heading={t.empty.groupAbout} prompts={t.prompts.about} onPrompt={onPrompt} />
       <p className="text-sm text-muted-foreground">
-        {rateLimitPerHour} messages/hour per visitor; regenerations count
+        {format(t.empty.rateNote, { n: rateLimitPerHour })}
       </p>
     </div>
   );

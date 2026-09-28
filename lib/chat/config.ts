@@ -1,3 +1,5 @@
+import { messages } from "@/lib/i18n/messages";
+
 /**
  * Chat configuration shared by the client and the server (spec §3.7).
  * Keep this module free of server-only imports: client components import it.
@@ -42,13 +44,11 @@ export const FIRST_CHUNK_TIMEOUT_MS = 20_000;
 /** streamText timeout between content chunks (D-S-04). */
 export const CHUNK_TIMEOUT_MS = 15_000;
 
-/** Empty-state buttons; each sends immediately (D-S-02). */
-export const SUGGESTED_PROMPTS = [
-  "200-word story about a lighthouse keeper",
-  "Explain how HTTPS works to a new developer",
-  "5 interview questions for a senior frontend engineer",
-  "Follow-up email after a job interview",
-] as const;
+/**
+ * The English demo prompts (delta spec §4.3, T-20). The empty state shows the selected
+ * language's; e2e/chat.spec.ts and the TTFT measurement (spec §5.2) click these.
+ */
+export const SUGGESTED_PROMPTS = messages.en.prompts.demo;
 
 /** Autoscroll keeps following while the view is at most this far from the bottom (D-S-08). */
 export const SCROLL_THRESHOLD_PX = 80;

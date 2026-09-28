@@ -32,7 +32,8 @@ export type Messages = {
 
 /**
  * Every visible and accessible interface string, in English and pt-BR (delta spec §4.3).
- * Pure and client-safe; it must not import lib/chat/config.ts.
+ * Pure and client-safe. lib/chat/config.ts re-exports the English demo prompts from here
+ * (SUGGESTED_PROMPTS), so this module must not import config.ts.
  */
 export const messages: Record<Locale, Messages> = {
   en: {

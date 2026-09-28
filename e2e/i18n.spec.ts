@@ -5,6 +5,32 @@ import { expect, test, type Page } from "@playwright/test";
 // Portuguese is asserted web-first only, and English only once the page has hydrated.
 // The expected strings are literals, re-declared as in chat.spec.ts.
 
+// The eight prompts in both languages (delta spec §4.3).
+const DEMO_PROMPTS_EN = [
+  "200-word story about a lighthouse keeper",
+  "Explain how HTTPS works to a new developer",
+  "5 interview questions for a senior frontend engineer",
+  "Follow-up email after a job interview",
+] as const;
+const ABOUT_PROMPTS_EN = [
+  "How was this chat built?",
+  "What tech stack does this project use?",
+  "What is this project for?",
+  "Who is Felipe, and what roles is he looking for?",
+] as const;
+const DEMO_PROMPTS_PT = [
+  "História de 200 palavras sobre um faroleiro",
+  "Explique como o HTTPS funciona para quem está começando",
+  "5 perguntas de entrevista para dev front-end sênior",
+  "E-mail de follow-up depois de uma entrevista",
+] as const;
+const ABOUT_PROMPTS_PT = [
+  "Como este chat foi construído?",
+  "Qual é a stack deste projeto?",
+  "Qual é o propósito deste projeto?",
+  "Quem é o Felipe e que vagas ele procura?",
+] as const;
+
 const header = (page: Page) => page.locator("header[data-model]");
 const footer = (page: Page) => page.locator("footer");
 // exact: a non-exact "EN" also matches "Send message".
@@ -40,6 +66,73 @@ async function expectEnglish(page: Page): Promise<void> {
   await expect(switchButton(page, "PT")).toHaveAttribute("aria-pressed", "false");
   await expect(newChatButton(page, "New chat")).toBeVisible();
 }
+
+/**
+ * One prompt group of the empty state (delta spec §5): its <h3> is visible and names the
+ * <section>, which holds exactly its 4 prompt buttons, in order.
+ */
+async function expectPromptGroup(
+  page: Page,
+  heading: string,
+  prompts: readonly string[],
+): Promise<void> {
+  await expect(page.getByRole("heading", { level: 3, name: heading, exact: true })).toBeVisible();
+  const group = page.getByRole("region", { name: heading, exact: true });
+  await expect(group.getByRole("button")).toHaveText(prompts);
+  for (const name of prompts) {
+    await expect(group.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+}
+
+test("1. / shows the demo group, then the about group, with the 8 English prompts", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  await expectPromptGroup(page, "Try streaming", DEMO_PROMPTS_EN);
+  await expectPromptGroup(page, "Ask about this project", ABOUT_PROMPTS_EN);
+  // Demo first, then about (T-07).
+  await expect(page.getByRole("heading", { level: 3 })).toHaveText([
+    "Try streaming",
+    "Ask about this project",
+  ]);
+  await expect(
+    page.getByText("20 messages/hour per visitor; regenerations count", { exact: true }),
+  ).toBeVisible();
+});
+
+test("2. PT translates the empty state: title, both groups, the 8 prompts and the rate note", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await waitForHydration(page);
+  await switchButton(page, "PT").click();
+  await expectPortuguese(page);
+
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name: "Veja a resposta chegar em tempo real",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Experimente: envie um prompt → aperte Parar (ou Esc) no meio → Gerar novamente",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expectPromptGroup(page, "Experimente o streaming", DEMO_PROMPTS_PT);
+  await expectPromptGroup(page, "Pergunte sobre o projeto", ABOUT_PROMPTS_PT);
+  await expect(page.getByRole("heading", { level: 3 })).toHaveText([
+    "Experimente o streaming",
+    "Pergunte sobre o projeto",
+  ]);
+  // {n} is RATE_LIMIT_PER_HOUR, 20 by default.
+  await expect(
+    page.getByText("20 mensagens/hora por visitante; regenerações contam", { exact: true }),
+  ).toBeVisible();
+});
 
 test("PT translates the header and the footer; EN switches back", async ({ page }) => {
   await page.goto("/");
