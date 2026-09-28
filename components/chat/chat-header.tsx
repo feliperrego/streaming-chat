@@ -1,4 +1,6 @@
 import { Plus } from "lucide-react";
+import { LanguageSwitch } from "@/components/chat/language-switch";
+import { useLocale } from "@/components/i18n/locale-provider";
 import { Button } from "@/components/ui/button";
 
 type ChatHeaderProps = {
@@ -13,6 +15,8 @@ type ChatHeaderProps = {
  * the measurement script reads: data-model, data-commit, and data-mock only in mock mode.
  */
 export function ChatHeader({ modelLabel, isMock, commit, onNewChat }: ChatHeaderProps) {
+  const { t } = useLocale();
+
   return (
     <header
       className="flex shrink-0 items-center gap-2 border-b px-4 py-2"
@@ -25,13 +29,19 @@ export function ChatHeader({ modelLabel, isMock, commit, onNewChat }: ChatHeader
       <span className="min-w-0 truncate font-medium">{modelLabel}</span>
       {isMock && (
         <span className="shrink-0 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
-          Mock model
+          {t.header.mockBadge}
         </span>
       )}
-      <Button variant="outline" className="ml-auto pointer-coarse:h-11" onClick={onNewChat}>
+      <Button
+        variant="outline"
+        className="ml-auto pointer-coarse:h-11 max-sm:aspect-square max-sm:px-0"
+        onClick={onNewChat}
+      >
         <Plus />
-        New chat
+        {/* Icon only below sm, so the header fits at 375 px; the accessible name stays (T-21). */}
+        <span className="max-sm:sr-only">{t.header.newChat}</span>
       </Button>
+      <LanguageSwitch />
     </header>
   );
 }
