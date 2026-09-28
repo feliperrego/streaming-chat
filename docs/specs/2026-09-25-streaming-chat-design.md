@@ -577,6 +577,28 @@ Record each result here, dated, once it is done. The README links to this sectio
 4. **Measurement run** (section 5.2), in its own rate-limit hour. Commit the JSON and the README lines together.
 5. **Rate limit** (template §9, step 7). In a fresh hour that is not check 4's hour, POST 21 requests to `/api/chat` with `-H 'Content-Type: application/json'` from one IP (a curl loop is fine). The 21st returns 429 with the demo-limit text and `Retry-After`.
 
+### Results (2026-09-28)
+
+Deployment: `https://streaming-chat-rho.vercel.app`, commit `feeaba6`, model `openai/gpt-6-luna`, Upstash `streaming-chat-ratelimit` in iad1.
+
+1. **Cancellation: partial, accepted.**
+   - A request for a 1000-word answer, cut by the client after 1.5 s, reached the AI Gateway log as **499** (client closed request). Our side works: the route aborted its Gateway call, and `supportsCancellation` together with `abortSignal` do their job.
+   - The Gateway still generated **1.0K output tokens over 11.9 s** and billed US$ 0.0005.
+   - The 15 measurement samples, where Stop was clicked right after the first token, show the same thing: 499 each, with 122–295 output tokens (the full short answer).
+   - So in production Stop does not save provider tokens through the AI Gateway [F: AI Gateway logs, 2026-09-28]. Vercel's docs say nothing about this case.
+   - Cost per answer is bounded by `MAX_OUTPUT_TOKENS` (1024, at most about US$ 0.0005). Felipe accepted this and asked for it to be documented (§14 A-20).
+2. **Consecutive user turns: pass.** A request with two consecutive user messages ("What is 2 + 2?", "Answer in one short sentence.") answered "2 + 2 = 4." and ended with `finish`.
+3. **Real phone at 375 px: pending**, to be done by Felipe on his phone.
+4. **Measurement: done.**
+   - Median 1340 ms (n=14, min 1222, max 1582); first request of the run 1090 ms; from Fortaleza, BR over fibre.
+   - Raw data: `measurements/ttft-2026-09-28.json`.
+   - The median is below the 1500 ms trigger in §10, so splitting TTFT into server and network time is not needed.
+5. **Rate limit: pass, with one observation.**
+   - The limit returned 429 with the exact demo-limit text and `Retry-After: 730`.
+   - By the controller's own count, the 429 came on the 20th request of the window rather than the 21st. That count may be off, or the limiter may be off by one; this is UNVERIFIED and does not weaken the protection. Trigger to revisit: a visitor reports being limited before 20 messages.
+
+Also exercised in production: an AI Gateway refusal (403) before any chunk returned only `SAFE_ERROR_MESSAGE` to the client and logged the raw error once (the §6 provider-failure row), and a `text/plain` POST returned 415.
+
 ## 10. Out of scope
 
 | Item | Trigger to revisit |
@@ -692,5 +714,6 @@ Before writing the implementation plan, a throwaway prototype of this spec was b
 | A-17 | Playwright: global `retries: 0`, with a single retry only in the calibration describe; `trace: "retain-on-failure"` | 5.3 |
 | A-18 | Extra files: `tests/helpers/sse.ts` (strict SSE parser for route tests) and `lib/measure/ttft-stats.ts` (unit-tested statistics and README lines); e2e "failure modes" tests for timeout, output limit, New chat while streaming, the 20-message cap and touch devices | 7, 8 |
 | A-19 | The system instructions honour an explicit length request up to about 700 words (an estimate of the 1024-token cap), still in plain text | 2.2 |
+| A-20 | [D, 2026-09-28, Felipe chose option A] Success criterion 2 ("Stop cancels the model call in production") cannot be met through the AI Gateway: Stop ends the stream up to the Gateway (499), but the Gateway completes and bills the provider generation (§9 results, check 1). The README says so; the cost bound is the 1024-token cap. Trigger to revisit: Vercel documents or ships upstream cancellation in the Gateway, or monthly Gateway spend for this project exceeds US$ 1 | 1, 9 |
 
 Approved by Felipe on 2026-09-26 ("todas ok"), together with the implementation plan. Cite as **D-amend**.
