@@ -1,6 +1,6 @@
 # Streaming Chat — median time to first token: pending the first production measurement
 
-[![CI](https://github.com/feliperrego/streaming-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/feliperrego/streaming-chat/actions/workflows/ci.yml) · **[Live demo](<demo URL>)** · Part of the [feliperrego.com](https://feliperrego.com) portfolio
+[![CI](https://github.com/feliperrego/streaming-chat/actions/workflows/ci.yml/badge.svg)](https://github.com/feliperrego/streaming-chat/actions/workflows/ci.yml) · **[Live demo](https://streaming-chat-rho.vercel.app)** · Part of the [feliperrego.com](https://feliperrego.com) portfolio
 
 ## Problem
 Chat interfaces feel slow when the answer appears only at the end, and they waste money when "Stop" only stops the screen. This demo streams every answer token by token, lets you stop or regenerate it at any moment, and shows how long the first token took.

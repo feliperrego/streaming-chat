@@ -191,6 +191,14 @@ The route runs on the Node runtime. It exports only `POST` and `maxDuration = 60
 - The shape of a V4 error stream part is UNVERIFIED. The fallback is a hand-written `ReadableStream` that enqueues 3 deltas, then calls `controller.error(new Error('boom'))`.
 - If neither works within 15 min, stop and ask Felipe whether to drop `[[error]]` and rely on the network-level error tests. Dropping it reverses D-S-16 [P].
 - **Model choice** [D-S-13]. Pick a non-reasoning model from the AI Gateway model list at implementation. Check the `streamText` warnings once to confirm that `reasoning: 'none'` is honoured. Candidate ids are UNVERIFIED.
+  - Chosen on 2026-09-28: `openai/gpt-6-luna` [D]. It was the cheapest listed model with an explicit `none` reasoning option (toggle plus `effort: none`), at $0.10 input and $0.50 output per 1M tokens [F: ai-gateway.vercel.sh/v1/models, 2026-09-28]. Whether it honours `reasoning: 'none'` is still UNVERIFIED; plan Task 12 Step 2 checks the warnings.
+  - Deploy environments [D, 2026-09-28]:
+    - Production: `AI_MODEL` is set and `AI_MOCK` is not. The template guard makes a mock-mode production build fail.
+    - Preview: `AI_MOCK=1`, so preview deploys cost nothing.
+    - Development: the Upstash variables are not set, so local runs never touch the production rate-limit store.
+  - Rate-limit store: Upstash for Redis `streaming-chat-ratelimit` in iad1, the same region as the function, on the free plan, with no read regions and no eviction.
+    - The integration injects `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`, `KV_URL` and `REDIS_URL` [F: `vercel env ls`, 2026-09-28].
+    - The limiter reads only the first two.
 
 ### 3.3 Validation and cleaning — `lib/chat/validate.ts` [D-S-17, D-S-21]
 

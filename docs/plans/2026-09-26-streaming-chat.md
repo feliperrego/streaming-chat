@@ -23,7 +23,7 @@
 
 It also passed stress runs of 96/96, 80/80 and 64/64. Copy the code exactly: it is already verified. A step whose command output differs from the "Expected" line is a real signal. Stop and report it; do not adjust the code to make it pass.
 
-**Working directory for every command:** `/Users/felipe/Projetos/Pessoal/streaming-chat` (this repo; it already holds the spec and this plan).
+**Working directory for every command:** `/Users/felipe/Projetos/Pessoal/portfolio/streaming-chat` (this repo; it already holds the spec and this plan). It was moved there from `/Users/felipe/Projetos/Pessoal/streaming-chat` on 2026-09-28.
 
 ## Global Constraints
 
