@@ -717,3 +717,7 @@ Before writing the implementation plan, a throwaway prototype of this spec was b
 | A-20 | [D, 2026-09-28, Felipe chose option A] Success criterion 2 ("Stop cancels the model call in production") cannot be met through the AI Gateway: Stop ends the stream up to the Gateway (499), but the Gateway completes and bills the provider generation (§9 results, check 1). The README says so; the cost bound is the 1024-token cap. Trigger to revisit: Vercel documents or ships upstream cancellation in the Gateway, or monthly Gateway spend for this project exceeds US$ 1 | 1, 9 |
 
 Approved by Felipe on 2026-09-26 ("todas ok"), together with the implementation plan. Cite as **D-amend**.
+
+**Amendment from a later spec** `[D]`:
+
+- **A-21** (2026-09-28, D-chat-2). `docs/specs/2026-09-28-about-and-i18n-design.md` changes D-chat-1 (UI language only; the README, docs and commits stay English), D-S-01/§2.2 (the instructions gain the profile and rules), D-S-02/§2.1 (two groups of 4 prompts), D-S-05/§2.3 (the limit banner shows client text in the selected language), §3.1 (the request body may carry `locale`), §3.7 (the prompts come from `lib/i18n/messages.ts`), and the English strings of §2.2–2.4 and A-13, which become the `en` values of a dictionary. In §5.2, "the 4 suggested prompts" means the 4 demo prompts. The README number is re-measured under that spec's §7. Where the two conflict, that spec wins.
