@@ -4,16 +4,13 @@ import {
   streamText,
   toUIMessageStream,
 } from "ai";
-import { getModel } from "@/lib/ai/model";
-import {
-  CHUNK_TIMEOUT_MS,
-  FIRST_CHUNK_TIMEOUT_MS,
-  MAX_OUTPUT_TOKENS,
-  SYSTEM_INSTRUCTIONS,
-} from "@/lib/chat/config";
+import { getModel, MODEL_LABEL } from "@/lib/ai/model";
+import { CHUNK_TIMEOUT_MS, FIRST_CHUNK_TIMEOUT_MS, MAX_OUTPUT_TOKENS } from "@/lib/chat/config";
 import { toSafeErrorMessage } from "@/lib/chat/errors";
+import { buildSystemInstructions } from "@/lib/chat/profile";
 import { validateAndClean } from "@/lib/chat/validate";
-import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
+import { isLocale, type Locale } from "@/lib/i18n/locale";
+import { RATE_LIMIT_PER_HOUR, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 // Node.js runtime (the Next.js default; no `runtime` export). Vercel request
 // cancellation needs it and `supportsCancellation` in vercel.json (spec §3.1).
@@ -36,6 +33,17 @@ function unsupportedMediaType(text: string): Response {
 /** The Content-Type media type, lower-cased and stripped of parameters (e.g. `; charset=utf-8`). */
 function mediaType(req: Request): string {
   return (req.headers.get("Content-Type") ?? "").split(";", 1)[0].trim().toLowerCase();
+}
+
+/**
+ * The interface language a client may send in the body (delta spec §3.3, T-11): exactly "en"
+ * or "pt-BR". Any other value, or none, is ignored and never causes a 400, so older clients
+ * keep working.
+ */
+function requestLocale(body: unknown): Locale | undefined {
+  if (typeof body !== "object" || body === null) return undefined;
+  const { locale } = body as { locale?: unknown };
+  return isLocale(locale) ? locale : undefined;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -61,11 +69,16 @@ export async function POST(req: Request): Promise<Response> {
   // 4. Validate and clean.
   const validated = await validateAndClean(body);
   if (!validated.ok) return badRequest(validated.text);
+  const locale = requestLocale(body);
 
   // 5. Stream.
   const result = streamText({
     model: getModel(),
-    instructions: SYSTEM_INSTRUCTIONS,
+    instructions: buildSystemInstructions({
+      model: MODEL_LABEL,
+      ratePerHour: RATE_LIMIT_PER_HOUR,
+      locale,
+    }),
     messages: await convertToModelMessages(validated.messages),
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     reasoning: "none",

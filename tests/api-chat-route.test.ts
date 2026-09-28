@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/chat/route";
 import { buildStreamParts, createMockModel, type MockStreamPart } from "@/lib/ai/mock";
 import { MOCK_ERROR_MESSAGE, resetMockScenarios } from "@/lib/ai/mock-scenarios";
-import { SYSTEM_INSTRUCTIONS } from "@/lib/chat/config";
 import { SAFE_ERROR_MESSAGE } from "@/lib/chat/errors";
+import { buildSystemInstructions } from "@/lib/chat/profile";
 import { chunkTypes, parseSse, textDeltas } from "./helpers/sse";
 
 // vi.mock factories are hoisted above the imports, so shared state comes from
@@ -26,11 +26,14 @@ vi.mock("@/lib/ai/model", () => ({
   },
 }));
 
-// Real rateLimitResponse, controlled rateLimit.
+// Real rateLimitResponse, controlled rateLimit, and an hourly limit the route must pass on
+// to the instructions (T-15).
 vi.mock("@/lib/rate-limit", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/rate-limit")>();
   return {
     ...actual,
+    // A limit no other constant shares (MAX_MESSAGES is 20), so a typed value fails.
+    RATE_LIMIT_PER_HOUR: 7,
     rateLimit: async (req: Request) => {
       h.rateLimitCalls.push(req);
       return h.rateLimitResult;
@@ -66,12 +69,19 @@ function history(count: number): TestMessage[] {
   );
 }
 
-/** The body the default chat transport posts (spec §4); the route reads only `messages`. */
-function chatRequest(messages: unknown, init: RequestInit = {}): Request {
+/**
+ * The body the default chat transport posts (spec §4), plus any `fields` a client may add,
+ * such as `locale` (delta spec §3.3). The route reads only `messages` and `locale`.
+ */
+function chatRequest(
+  messages: unknown,
+  init: RequestInit = {},
+  fields: Record<string, unknown> = {},
+): Request {
   return new Request("http://localhost/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: "chat-1", messages, trigger: "submit-message" }),
+    body: JSON.stringify({ id: "chat-1", messages, trigger: "submit-message", ...fields }),
     ...init,
   });
 }
@@ -79,6 +89,12 @@ function chatRequest(messages: unknown, init: RequestInit = {}): Request {
 function fastModel(chunks: string[]) {
   return createMockModel({ initialDelayInMs: 0, chunkDelayInMs: 0, chunks });
 }
+
+/**
+ * The instructions the route builds with the mocked MODEL_LABEL and RATE_LIMIT_PER_HOUR, and
+ * no locale. The 7 is a literal, so the route must read the constant, not repeat the default.
+ */
+const INSTRUCTIONS = buildSystemInstructions({ model: "mock", ratePerHour: 7 });
 
 beforeEach(() => {
   h.model = undefined;
@@ -134,9 +150,42 @@ describe("POST /api/chat — happy path", () => {
     expect(call.maxOutputTokens).toBe(1024);
     expect(call.reasoning).toBe("none");
     expect(call.prompt).toEqual([
-      { role: "system", content: SYSTEM_INSTRUCTIONS },
+      { role: "system", content: INSTRUCTIONS },
       { role: "user", content: [{ type: "text", text: "Hi" }] },
     ]);
+  });
+
+  it.each([
+    ["pt-BR", "Interface language: Portuguese (Brazil)."],
+    ["en", "Interface language: English."],
+  ])("appends the interface-language line for locale %j", async (locale, line) => {
+    const model = fastModel(["ok"]);
+    h.model = model;
+
+    const res = await POST(chatRequest([user("Hi")], {}, { locale }));
+    expect(res.status).toBe(200);
+    await res.text();
+
+    expect(model.doStreamCalls[0].prompt[0]).toEqual({
+      role: "system",
+      content: `${INSTRUCTIONS}\n\n${line}`,
+    });
+  });
+
+  it.each([
+    ["no locale", {}],
+    ['locale "fr"', { locale: "fr" }],
+    ["locale 42", { locale: 42 }],
+    ['locale "pt-br"', { locale: "pt-br" }],
+  ])("adds no interface-language line for %s, and still returns 200", async (_, fields) => {
+    const model = fastModel(["ok"]);
+    h.model = model;
+
+    const res = await POST(chatRequest([user("Hi")], {}, fields));
+    expect(res.status).toBe(200);
+    await res.text();
+
+    expect(model.doStreamCalls[0].prompt[0]).toEqual({ role: "system", content: INSTRUCTIONS });
   });
 
   it("never sends reasoning parts to the client", async () => {
@@ -309,7 +358,7 @@ describe("POST /api/chat — failures", () => {
     ).text();
 
     expect(model.doStreamCalls[0].prompt).toEqual([
-      { role: "system", content: SYSTEM_INSTRUCTIONS },
+      { role: "system", content: INSTRUCTIONS },
       { role: "user", content: [{ type: "text", text: "First question\n\nSecond question" }] },
     ]);
   });
