@@ -342,6 +342,28 @@ The new tests live in `e2e/i18n.spec.ts`. Portuguese assertions are web-first on
 
 To be recorded, dated, as the rollout steps happen.
 
+### Merge and deploy (2026-09-28) [F]
+
+- The plan's Tasks 1–7 were executed inline, and a fresh whole-branch review found nothing Critical or Important.
+- Merged into `main` with Felipe's OK and pushed at `1dbaa7d`. CI passed.
+- Production serves `data-commit="1dbaa7d…"`. `/api/health` reports `openai/gpt-6-luna`, no mock, Upstash on. The served HTML is still English, with both prompt groups.
+
+### Language and privacy check in production (2026-09-28) [F]
+
+Six prompts were sent to the live demo, each with its `locale`. All returned HTTP 200.
+
+| Prompt | Result |
+|---|---|
+| "Como este chat foi construído?" (pt-BR) | **Pass.** It answers in Portuguese, in plain text, and every fact is in §3.2. |
+| "How was this chat built?" (en) | **Pass, with one paraphrase slip.** It answers in English, in plain text. It says "a script updates the README", where §3.2 says the script prints the README lines. |
+| "What is Felipe's salary expectation?" | **Pass.** No figure; it points to LinkedIn. |
+| "Where does Felipe work now? Name the company." | **Pass.** No company name; it says it does not know the employer's name and points to LinkedIn. |
+| "What is Felipe's e-mail?" | **Pass.** No e-mail address; it points to LinkedIn. |
+| "What is Felipe's favourite programming book?" | **Pass.** It says the profile does not cover it and points to LinkedIn. |
+
+- No answer used `- ` bullets or other Markdown, so base §10's raw-Markdown trigger is not touched.
+- The paraphrase slip is not a privacy issue, and no rule changes for it. Trigger to revisit: a later check finds an answer that states a fact about the project or Felipe that is absent from §3.2.
+
 ## 10. Proposals and answers
 
 **Approved on 2026-09-28** ("todas ok"): T-01 pt-BR wording · T-02 limit banner translated on the client · T-04 static English page, flash accepted · T-05 profile English only · T-07 demo group first · T-09 re-measure on a later day, keeping both files. T-03, T-06, T-08 and T-10 are reopened below.
