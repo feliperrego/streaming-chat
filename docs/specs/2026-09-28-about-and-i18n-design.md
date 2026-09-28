@@ -364,6 +364,11 @@ Six prompts were sent to the live demo, each with its `locale`. All returned HTT
 - No answer used `- ` bullets or other Markdown, so base §10's raw-Markdown trigger is not touched.
 - The paraphrase slip is not a privacy issue, and no rule changes for it. Trigger to revisit: a later check finds an answer that states a fact about the project or Felipe that is absent from §3.2.
 
+### Phone check (2026-09-28) [D]
+
+- Felipe checked the live demo on his phone and reported "tudo ok". The list covered the 8 prompts, the header and switch, an about prompt, New chat after a long answer, and whether the page flashes English before Portuguese.
+- No issue was reported, so the English-flash trigger (T-26) has not fired.
+
 ## 10. Proposals and answers
 
 **Approved on 2026-09-28** ("todas ok"): T-01 pt-BR wording · T-02 limit banner translated on the client · T-04 static English page, flash accepted · T-05 profile English only · T-07 demo group first · T-09 re-measure on a later day, keeping both files. T-03, T-06, T-08 and T-10 are reopened below.
