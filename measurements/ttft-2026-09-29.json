@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-29T23:48:49.276Z",
+  "url": "https://streaming-chat-rho.vercel.app",
+  "model": "openai/gpt-6-luna",
+  "location": "Fortaleza, BR — fibra",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.8010.12 Safari/537.36",
+  "browserVersion": "153.0.8010.12",
+  "platform": "darwin 25.6.0",
+  "commit": "cd14c106596bd151082f993a3d858b312390d03b",
+  "aborted": false,
+  "firstRequestMs": 2002,
+  "samplesMs": [
+    1739,
+    1310,
+    1534,
+    1487,
+    1552,
+    1820,
+    1524,
+    1558,
+    1643,
+    1844,
+    1456,
+    1433,
+    1506,
+    1423
+  ],
+  "n": 14,
+  "median": 1529,
+  "min": 1310,
+  "max": 1844
+}

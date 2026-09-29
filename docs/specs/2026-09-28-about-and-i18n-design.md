@@ -369,6 +369,19 @@ Six prompts were sent to the live demo, each with its `locale`. All returned HTT
 - Felipe checked the live demo on his phone and reported "tudo ok". The list covered the 8 prompts, the header and switch, an about prompt, New chat after a long answer, and whether the page flashes English before Portuguese.
 - No issue was reported, so the English-flash trigger (T-26) has not fired.
 
+### Re-measurement of time to first token (2026-09-29) [F]
+
+Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as the first run.
+
+| Run | Commit served | Median | n | Min / max | First request of the run | Location |
+|---|---|---|---|---|---|---|
+| 2026-09-28 02:44 UTC (`measurements/ttft-2026-09-28.json`) | `feeaba6`, before this change | 1340 ms | 14 | 1222 / 1582 ms | 1090 ms | Fortaleza, BR — fibra |
+| 2026-09-29 23:48 UTC (`measurements/ttft-2026-09-29.json`) | `cd14c10`, with the profile instructions | 1529 ms | 14 | 1310 / 1844 ms | 2002 ms | Fortaleza, BR — fibra |
+
+- The README's line 1 and first "How it's measured" line are the ones the script printed.
+- The difference is not attributed to the larger instructions: the runs are on different days and at different times of day, with n = 14 each (§7).
+- The new median is above 1500 ms, so base §10's trigger for the server-side TTFT split ("Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | The observability portfolio project starts, or a client median TTFT above 1500 ms") fired. Felipe decides what to do [T-25]; his answer is recorded below.
+
 ## 10. Proposals and answers
 
 **Approved on 2026-09-28** ("todas ok"): T-01 pt-BR wording · T-02 limit banner translated on the client · T-04 static English page, flash accepted · T-05 profile English only · T-07 demo group first · T-09 re-measure on a later day, keeping both files. T-03, T-06, T-08 and T-10 are reopened below.
@@ -394,4 +407,3 @@ Six prompts were sent to the live demo, each with its `locale`. All returned HTT
 | T-25 | Re-defer the larger measurement infrastructure with a new trigger; a median above 1500 ms goes to Felipe. | 7 |
 | T-26 | Two triggers. The English flash is revisited if the phone check with `?lang=pt-BR` or a visitor finds it noticeable (then: a blocking inline script before first paint). Browser-language detection is added if a visitor with a Portuguese browser reports landing in English, or if Felipe starts sharing the demo mainly with Brazilian recruiters. | 1, 4.2 |
 | T-27 | The success criteria (§1) and the individual test cases (§6) as rewritten. Replaces T-10. | 1, 6 |
-
