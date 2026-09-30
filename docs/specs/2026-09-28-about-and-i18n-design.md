@@ -381,6 +381,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 - The README's line 1 and first "How it's measured" line are the ones the script printed.
 - The difference is not attributed to the larger instructions: the runs are on different days and at different times of day, with n = 14 each (§7).
 - The new median is above 1500 ms, so base §10's trigger for the server-side TTFT split ("Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | The observability portfolio project starts, or a client median TTFT above 1500 ms") fired. Felipe decides what to do [T-25]; his answer is recorded below.
+- **Felipe's answer** (2026-09-29, "a") [D: T-25]: defer the split again, to the observability project, #12 "Call tracing" in `portfolio/ROADMAP.md` (a dashboard of every model call with tokens, cost and latency). New trigger: when #12 starts. Base §10's row is updated to say so.
 
 ## 10. Proposals and answers
 
