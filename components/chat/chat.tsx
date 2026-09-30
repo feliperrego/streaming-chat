@@ -50,6 +50,8 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
   const [interrupted, setInterrupted] = useState(false);
   // The user pressed Stop or Esc during the last request (D-S-22).
   const [stoppedByUser, setStoppedByUser] = useState(false);
+  // Counts New chat presses; the focus effect below runs on each.
+  const [newChats, setNewChats] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const { messages, status, error, sendMessage, regenerate, stop, setMessages, clearError } =
@@ -127,7 +129,7 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     // The empty state opens at its title, not at the old scroll position (T-22). The list
     // unmounts in the next commit, which disconnects the observers that pin to the bottom.
     scrollElementRef.current?.scrollTo({ top: 0, behavior: "instant" });
-    focusUnlessTouch(inputRef.current);
+    setNewChats((count) => count + 1);
   };
 
   // Esc stops from anywhere on the page, but only while busy (D-S-06).
@@ -140,10 +142,12 @@ export function Chat({ modelLabel, isMock, commit, rateLimitPerHour }: ChatProps
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [busy, handleStop]);
 
-  // Focus the composer on load, except on touch devices (spec §2.5).
+  // Focus the composer on load and after each New chat (spec §14 A-14), except on touch devices
+  // (spec §2.5). After New chat the focus waits for the commit: at the message cap the composer
+  // is disabled until then, and focus() does nothing on a disabled control (spec §14 A-22).
   useEffect(() => {
     focusUnlessTouch(inputRef.current);
-  }, []);
+  }, [newChats]);
 
   // Polite announcements for screen readers; tokens are never read aloud (spec §2.4).
   const lastMessage = messages.at(-1);

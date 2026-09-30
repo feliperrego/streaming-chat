@@ -675,6 +675,8 @@ test.describe("7. input and New chat", () => {
     for (const prompt of APPROVED_PROMPTS) {
       await expect(page.getByRole("button", { name: prompt, exact: true })).toBeVisible();
     }
+    // New chat refocuses the composer on a fine pointer, same as sending.
+    await expect(composer(page)).toBeFocused();
   });
 });
 
@@ -776,23 +778,30 @@ test.describe("8. failure modes", () => {
     await expect(promptButton(page, 0)).toBeVisible();
   });
 
-  test("20 messages disable the composer with the cap placeholder; New chat re-enables it", async ({
-    page,
-  }) => {
-    await page.goto("/");
+  /**
+   * Sends one-word answers until the conversation holds MAX_MESSAGES messages, and returns the
+   * messages.length of each posted body.
+   */
+  async function fillToTheCap(page: Page): Promise<number[]> {
     const postedSizes: number[] = [];
     await page.route("**/api/chat", async (route) => {
       const body = route.request().postDataJSON() as ChatRequestBody;
       postedSizes.push(body.messages.length);
       await fulfillSse(route, textAnswer("ok"));
     });
-
-    const roundTrips = MAX_MESSAGES / 2;
-    for (let i = 0; i < roundTrips; i++) {
+    for (let i = 0; i < MAX_MESSAGES / 2; i++) {
       await sendText(page, `message ${i + 1}`);
-      await expect(assistantBubbles(page)).toHaveCount(i + 1);
-      await waitUntilIdle(page);
+      await waitForAnswers(page, i + 1);
     }
+    await expect(composer(page)).toBeDisabled();
+    return postedSizes;
+  }
+
+  test("20 messages disable the composer with the cap placeholder; New chat re-enables it", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const postedSizes = await fillToTheCap(page);
     expect(Math.max(...postedSizes), "largest posted messages.length").toBeLessThanOrEqual(
       MAX_MESSAGES,
     );
@@ -806,6 +815,41 @@ test.describe("8. failure modes", () => {
     await header(page).getByRole("button", { name: "New chat" }).click();
     await expect(composer(page)).toBeEnabled();
     await expect(composer(page)).toHaveAttribute("placeholder", COMPOSER_PLACEHOLDER);
+    // Focused on a fine pointer, as after Send, Stop and Regenerate, though it was disabled until
+    // New chat: the next message needs no click.
+    await expect(composer(page)).toBeFocused();
+    await page.keyboard.type("next");
+    await expect(composer(page)).toHaveValue("next");
+  });
+
+  test("at the cap, New chat from the keyboard puts the focus in the composer", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await fillToTheCap(page);
+
+    // Keyboard only: back through the page to New chat, then Enter.
+    const newChat = header(page).getByRole("button", { name: "New chat" });
+    const trail: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      if (await newChat.evaluate((element) => element === document.activeElement)) break;
+      await page.keyboard.press("Shift+Tab");
+      trail.push(
+        await page.evaluate(
+          () =>
+            document.activeElement?.getAttribute("aria-label") ??
+            document.activeElement?.textContent ??
+            "",
+        ),
+      );
+    }
+    await expect(newChat, `focus went through: ${trail.join(" | ")}`).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(composer(page)).toBeEnabled();
+    await expect(composer(page)).toBeFocused();
+    await page.keyboard.type("next");
+    await expect(composer(page)).toHaveValue("next");
   });
 
   test.describe("touch device", () => {
