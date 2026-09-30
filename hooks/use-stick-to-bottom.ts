@@ -39,7 +39,7 @@ function isTextEntry(target: EventTarget | null): boolean {
  * only while the content overflows, since with nothing to scroll there is nothing to jump to.
  * A scroll up that lands more than the threshold from the bottom always stops it. It resumes
  * on a scroll down that lands within the threshold, when the content stops overflowing, or on
- * scrollToBottom().
+ * scrollToBottom(). A scroll event that does not move the view never resumes it.
  */
 export function useStickToBottom(): StickToBottom {
   // Callback refs stored in state, so the effects re-run if either element remounts.
@@ -62,8 +62,15 @@ export function useStickToBottom(): StickToBottom {
     // With nothing to scroll, no scroll event will ever fire to resume following, so an
     // upward intent here must not stop it (spec §14 A-11): there is nothing to jump to.
     const overflows = () => scrollElement.scrollHeight > scrollElement.clientHeight;
+    // A stop intent can arrive between the last pin and that pin's scroll event, which fires
+    // only at the next rendering step. Recording the position here makes that event read as no
+    // move, so it cannot resume following (spec §14 A-22).
+    const stop = () => {
+      lastScrollTop = scrollElement.scrollTop;
+      setFollowing(false);
+    };
     const onWheel = (event: WheelEvent) => {
-      if (event.deltaY < 0 && overflows()) setFollowing(false);
+      if (event.deltaY < 0 && overflows()) stop();
     };
     const onTouchStart = (event: TouchEvent) => {
       lastTouchY = event.touches[0]?.clientY ?? null;
@@ -72,23 +79,25 @@ export function useStickToBottom(): StickToBottom {
       const touchY = event.touches[0]?.clientY;
       if (touchY === undefined) return;
       // The finger moving down scrolls the content up.
-      if (lastTouchY !== null && touchY > lastTouchY && overflows()) setFollowing(false);
+      if (lastTouchY !== null && touchY > lastTouchY && overflows()) stop();
       lastTouchY = touchY;
     };
     const onScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = scrollElement;
       const movedUp = scrollTop < lastScrollTop;
+      const movedDown = scrollTop > lastScrollTop;
       lastScrollTop = scrollTop;
       const nearBottom = isNearBottom(scrollTop, scrollHeight, clientHeight);
       // Direction matters: an upward wheel's first scroll events still land near the
-      // bottom (they must not resume), and a smooth Jump passes through positions far
-      // from the bottom on its way down (they must not stop following).
-      if (nearBottom && !movedUp) setFollowing(true);
+      // bottom (they must not resume), a smooth Jump passes through positions far
+      // from the bottom on its way down (they must not stop following), and an event
+      // with no move, like a pin's that a stop intent overtook, must not resume.
+      if (nearBottom && movedDown) setFollowing(true);
       else if (!nearBottom && movedUp) setFollowing(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (SCROLL_UP_KEYS.has(event.key) && !isTextEntry(event.target) && overflows()) {
-        setFollowing(false);
+        stop();
       }
     };
 
