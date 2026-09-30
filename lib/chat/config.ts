@@ -29,7 +29,10 @@ export const SYSTEM_INSTRUCTIONS = [
 /** Longest user message, in characters (D-S-03). The composer's maxLength matches it. */
 export const MAX_USER_CHARS = 2000;
 
-/** Longest assistant message accepted back from the client, in characters (spec §3.3, C-09). */
+/**
+ * Longest assistant text the route passes back to the model, in characters (spec §3.3, C-09); a
+ * longer one is cut to its end (lib/chat/validate.ts, spec §14 A-22).
+ */
 export const MAX_ASSISTANT_CHARS = 6000;
 
 /** Most messages in one conversation, counted as the raw messages.length (D-S-03). */

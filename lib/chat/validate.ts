@@ -12,7 +12,6 @@ export const VALIDATION_ERRORS = {
   userPart: "Invalid request: user messages may contain text parts only.",
   tooMany: `Invalid request: a conversation may have at most ${MAX_MESSAGES} messages.`,
   userTooLong: `Invalid request: a user message may have at most ${MAX_USER_CHARS} characters.`,
-  assistantTooLong: `Invalid request: an assistant message may have at most ${MAX_ASSISTANT_CHARS} characters.`,
   noUser: "Invalid request: the conversation needs at least one user message.",
 } as const;
 
@@ -32,12 +31,29 @@ function textOf(message: UIMessage): string {
 type Turn = { id: string; role: "user" | "assistant"; text: string };
 
 /**
+ * The last MAX_ASSISTANT_CHARS characters of an assistant text (spec §14 A-22). An honest answer
+ * can be longer: a model above the limit's characters per token at the token cap, or the mock's
+ * [[slow]] answer, which ignores the cap. The client posts it again with every later message, so
+ * a 400 would fail each one, Retry included. The end is kept because "continue" is the natural
+ * follow-up to a cut answer. The cut never starts on the second half of a surrogate pair.
+ */
+function clipAssistantText(text: string): string {
+  if (text.length <= MAX_ASSISTANT_CHARS) return text;
+  let start = text.length - MAX_ASSISTANT_CHARS;
+  const code = text.charCodeAt(start);
+  if (code >= 0xdc00 && code <= 0xdfff) start += 1;
+  return text.slice(start);
+}
+
+/**
  * Validates the body the chat transport posts and cleans its messages for the
  * model (spec §3.3). Pure; async only because safeValidateUIMessages is.
  *
  * Order: shape and role checks, then limits on the messages as received,
  * then cleaning. Limits are not re-checked after merging, so a stopped and
- * re-sent prompt never produces a 400 (C-15).
+ * re-sent prompt never produces a 400 (C-15). An assistant text over
+ * MAX_ASSISTANT_CHARS is not rejected but cut to its end while cleaning, so the
+ * model's input stays bounded and an honest history never gets a 400 (spec §14 A-22).
  *
  * The cleaned messages are rebuilt as { id, role, parts: [one text part] }:
  * every other field a client sent (metadata, providerMetadata, state) is
@@ -64,24 +80,21 @@ export async function validateAndClean(body: unknown): Promise<ValidateResult> {
   if (received.length > MAX_MESSAGES) return reject(VALIDATION_ERRORS.tooMany);
 
   for (const message of received) {
-    const length = textOf(message).length;
-    if (message.role === "user" && length > MAX_USER_CHARS) {
+    if (message.role === "user" && textOf(message).length > MAX_USER_CHARS) {
       return reject(VALIDATION_ERRORS.userTooLong);
-    }
-    if (message.role === "assistant" && length > MAX_ASSISTANT_CHARS) {
-      return reject(VALIDATION_ERRORS.assistantTooLong);
     }
   }
 
-  // 3. Cleaning: keep only assistant text, drop assistant turns with no
-  // non-whitespace text (left by an early Stop), and merge consecutive user
-  // messages with a blank line (D-S-21).
+  // 3. Cleaning: keep only assistant text, cut to MAX_ASSISTANT_CHARS, drop
+  // assistant turns with no non-whitespace text (left by an early Stop), and
+  // merge consecutive user messages with a blank line (D-S-21).
   const turns: Turn[] = [];
   for (const message of received) {
     const text = textOf(message);
 
     if (message.role === "assistant") {
-      if (text.trim() !== "") turns.push({ id: message.id, role: "assistant", text });
+      const kept = clipAssistantText(text);
+      if (kept.trim() !== "") turns.push({ id: message.id, role: "assistant", text: kept });
       continue;
     }
 

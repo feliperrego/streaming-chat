@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page, type Request, type Route } from "@playwright/test";
 import { COMPOSER_PLACEHOLDER } from "@/components/chat/composer";
-import { FIRST_CHUNK_TIMEOUT_MS, MAX_MESSAGES, MAX_USER_CHARS, SUGGESTED_PROMPTS } from "@/lib/chat/config";
+import {
+  FIRST_CHUNK_TIMEOUT_MS,
+  MAX_ASSISTANT_CHARS,
+  MAX_MESSAGES,
+  MAX_USER_CHARS,
+  SUGGESTED_PROMPTS,
+} from "@/lib/chat/config";
 
 // E2E for spec §8.3: the production build in mock mode (AI_MOCK=1), zero cost.
 // The mock's first chunk arrives 600 ms after the request (D-S-12); [[slow]] streams
@@ -66,6 +72,18 @@ function isChatPost(request: Request): boolean {
   return request.method() === "POST" && new URL(request.url()).pathname === "/api/chat";
 }
 
+/** Runs `action` and returns the body of the POST /api/chat it sends. */
+async function postedBody(page: Page, action: () => Promise<void>): Promise<ChatRequestBody> {
+  const posted = page.waitForRequest(isChatPost);
+  await action();
+  return (await posted).postDataJSON() as ChatRequestBody;
+}
+
+/** The text parts of a posted message, joined. */
+function postedText(message: PostedMessage): string {
+  return message.parts.map((part) => (part.type === "text" ? (part.text ?? "") : "")).join("");
+}
+
 /** One SSE frame per chunk, exactly as createUIMessageStreamResponse writes it, then [DONE]. */
 function sse(chunks: object[]): string {
   return chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n";
@@ -101,6 +119,12 @@ async function sendText(page: Page, text: string): Promise<void> {
 /** Waits until the request is over: the Stop button has turned back into Send. */
 async function waitUntilIdle(page: Page): Promise<void> {
   await expect(sendButton(page)).toBeVisible({ timeout: 20_000 });
+}
+
+/** Waits until the page shows `count` answers and the last request is over. */
+async function waitForAnswers(page: Page, count = 1): Promise<void> {
+  await expect(assistantBubbles(page)).toHaveCount(count, { timeout: 20_000 });
+  await waitUntilIdle(page);
 }
 
 async function textLength(bubble: Locator): Promise<number> {
@@ -298,6 +322,63 @@ test("4. Regenerate re-sends only the user turn and shows one answer with a fres
   await expect(assistantBubbles(page)).toHaveCount(1);
   await expect(userBubbles(page)).toHaveCount(1);
   await expect(regenerateButtons(page)).toHaveCount(1);
+});
+
+// The client posts every earlier answer again. An answer can be longer than MAX_ASSISTANT_CHARS:
+// the mock's [[slow]] answer (300 lines, ignoring the token cap), a [[slow]] answer stopped past
+// the limit, or a real answer cut at the token cap above the limit's characters per token. The
+// next message must still get an answer, not a 400 that Retry would post again (spec §14 A-22).
+test.describe("4. a follow-up after an answer longer than MAX_ASSISTANT_CHARS", () => {
+  /** Sends a follow-up to the real route and expects the default answer as the second answer. */
+  async function expectFollowUpAnswered(page: Page): Promise<void> {
+    const followUp = "And a short follow-up";
+    const body = await postedBody(page, () => sendText(page, followUp));
+    // The input: the posted history carries the long answer whole.
+    expect(body.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+    expect(postedText(body.messages[1]).length).toBeGreaterThan(MAX_ASSISTANT_CHARS);
+
+    await waitForAnswers(page, 2);
+    await expect(banner(page)).toHaveCount(0);
+    await expect(answerText(assistantBubbles(page).nth(1))).toHaveText(FULL_DEFAULT_ANSWER);
+    await expect(userBubbles(page)).toHaveCount(2);
+    await expect(userBubbles(page).nth(1)).toHaveText(followUp);
+  }
+
+  test("a completed [[slow]] answer", async ({ page }) => {
+    await page.goto("/");
+    await sendText(page, SLOW_PROMPT);
+    await waitForAnswers(page);
+    await expectFollowUpAnswered(page);
+  });
+
+  test("a [[slow]] answer stopped past MAX_ASSISTANT_CHARS", async ({ page }) => {
+    await page.goto("/");
+    await sendText(page, SLOW_PROMPT);
+    const bubble = assistantBubbles(page);
+    await expect
+      .poll(() => textLength(bubble), { timeout: 15_000 })
+      .toBeGreaterThan(MAX_ASSISTANT_CHARS);
+    await stopButton(page).click();
+    await expect(bubble.getByText("Stopped", { exact: true })).toBeVisible();
+    await expectFollowUpAnswered(page);
+  });
+
+  test("an answer cut at the length limit past MAX_ASSISTANT_CHARS", async ({ page }) => {
+    await page.goto("/");
+    const longAnswer = "A long answer that runs on. ".repeat(
+      Math.ceil(MAX_ASSISTANT_CHARS / 28) + 10,
+    );
+    await page.route("**/api/chat", (route) =>
+      fulfillSse(route, textAnswer(longAnswer.trim(), "length")),
+    );
+    await sendText(page, "write 5000 words");
+    await waitForAnswers(page);
+    await expect(
+      assistantBubbles(page).getByText("Cut at demo length limit", { exact: true }),
+    ).toBeVisible();
+    await page.unroute("**/api/chat");
+    await expectFollowUpAnswered(page);
+  });
 });
 
 test.describe("5. autoscroll", () => {

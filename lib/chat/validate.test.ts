@@ -64,7 +64,6 @@ describe("validateAndClean — rejects with 400", () => {
     ["a user file part", { messages: [{ id: "u", role: "user", parts: [{ type: "file", mediaType: "image/png", url: "data:image/png;base64,AA==" }, { type: "text", text: "see" }] }] }, VALIDATION_ERRORS.userPart],
     ["a user text of 2001 characters", { messages: [user("u".repeat(2001))] }, VALIDATION_ERRORS.userTooLong],
     ["a user message whose text parts add up to 2001 characters", { messages: [{ id: "u", role: "user", parts: [{ type: "text", text: "u".repeat(1000) }, { type: "text", text: "u".repeat(1001) }] }] }, VALIDATION_ERRORS.userTooLong],
-    ["an assistant text of 6001 characters", { messages: [user("Hi"), assistantText("a".repeat(6001)), user("More")] }, VALIDATION_ERRORS.assistantTooLong],
     ["21 messages", { messages: history(21) }, VALIDATION_ERRORS.tooMany],
     ["only assistant messages", { messages: [assistantText("Hello")] }, VALIDATION_ERRORS.noUser],
     ["a body that is not an object", "hello", VALIDATION_ERRORS.shape],
@@ -125,6 +124,25 @@ describe("validateAndClean — cleaning", () => {
     const a = "a".repeat(1500);
     const b = "b".repeat(1500);
     expect(await cleaned([user(a), user(b)])).toEqual([{ role: "user", text: `${a}\n\n${b}` }]);
+  });
+
+  // An honest history can carry a longer answer (a mock that ignores the token cap, a model
+  // above the limit's characters per token), and the client posts it with every later message.
+  it("cuts an assistant text over 6000 characters to its last 6000, with no 400", async () => {
+    const head = "h".repeat(100);
+    const tail = "t".repeat(6000);
+    expect(await cleaned([user("Hi"), assistantText(head + tail), user("More")])).toEqual([
+      { role: "user", text: "Hi" },
+      { role: "assistant", text: tail },
+      { role: "user", text: "More" },
+    ]);
+  });
+
+  it("never starts the cut on the second half of a surrogate pair", async () => {
+    // "😀" is two UTF-16 code units; the cut point falls between them.
+    const text = "😀" + "t".repeat(5999);
+    const [, answer] = await cleaned([user("Hi"), assistantText(text), user("More")]);
+    expect(answer.text).toBe("t".repeat(5999));
   });
 
   it("merges three consecutive user messages into one, in order", async () => {

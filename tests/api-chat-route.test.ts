@@ -332,7 +332,6 @@ describe("POST /api/chat — failures", () => {
         ]),
     ],
     ["21 messages", () => chatRequest(history(21))],
-    ["an assistant turn over 6000 characters", () => chatRequest([user("Hi"), assistant("a".repeat(6001)), user("More")])],
     ["a user message over 2000 characters", () => chatRequest([user("u".repeat(2001))])],
     ["a body without messages", () => chatRequest(undefined)],
   ];
@@ -347,6 +346,23 @@ describe("POST /api/chat — failures", () => {
     expect(res.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
     expect((await res.text()).startsWith("Invalid request:")).toBe(true);
     expect(model.doStreamCalls).toHaveLength(0);
+  });
+
+  it("answers a history with an assistant turn over 6000 characters, cut to its end for the model", async () => {
+    const model = fastModel(["ok"]);
+    h.model = model;
+    const tail = "t".repeat(6000);
+
+    const res = await POST(chatRequest([user("Hi"), assistant(`head ${tail}`), user("More")]));
+
+    expect(res.status).toBe(200);
+    await res.text();
+    expect(model.doStreamCalls[0].prompt).toEqual([
+      { role: "system", content: INSTRUCTIONS },
+      { role: "user", content: [{ type: "text", text: "Hi" }] },
+      { role: "assistant", content: [{ type: "text", text: tail }] },
+      { role: "user", content: [{ type: "text", text: "More" }] },
+    ]);
   });
 
   it("leaves an empty assistant turn out of the model prompt and merges the user turns around it", async () => {
