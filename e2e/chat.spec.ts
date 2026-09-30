@@ -777,5 +777,48 @@ test.describe("8. failure modes", () => {
       }));
       expect(widths.scroll).toBeLessThanOrEqual(widths.client);
     });
+
+    // A rotation that makes the question above take fewer lines: Chromium's scroll anchoring
+    // moves the view up by the lines saved, and if a script reads the layout before the next
+    // frame, that scroll event reaches the hook before the resize observer pins the view, so
+    // following stops. The hook turns anchoring off while following (spec §14 A-22), so the view
+    // never moves up. The resize is sent through CDP together with the read, so the read lands
+    // before the frame.
+    test("touch: a rotation never moves a followed view up", async ({ page }) => {
+      await page.goto("/");
+      await composer(page).tap();
+      await composer(page).fill(
+        `Explain, in one short paragraph, what streaming means for a chat interface. ${SLOW_PROMPT}`,
+      );
+      await sendButton(page).tap();
+      await waitUntilIdle(page);
+      await expect.poll(() => distanceFromBottom(page)).toBeLessThanOrEqual(2);
+      const before = (await scrollState(page)).scrollTop;
+
+      await scroller(page).evaluate((element) => {
+        (window as unknown as { scroller: Element }).scroller = element;
+      });
+      const cdp = await page.context().newCDPSession(page);
+      const scale = await page.evaluate(() => window.devicePixelRatio);
+      const [, read] = await Promise.all([
+        cdp.send("Emulation.setDeviceMetricsOverride", {
+          width: 812,
+          height: 375,
+          deviceScaleFactor: scale,
+          mobile: true,
+        }),
+        cdp.send("Runtime.evaluate", {
+          expression: "(window.scroller).scrollTop",
+          returnByValue: true,
+        }),
+      ]);
+      expect(read.result.value, "scrollTop at the first layout after rotating").toBeGreaterThanOrEqual(
+        before,
+      );
+      await expect
+        .poll(() => distanceFromBottom(page), { message: "distance from bottom after rotating" })
+        .toBeLessThanOrEqual(2);
+      await expect(jumpButton(page)).toHaveCount(0);
+    });
   });
 });

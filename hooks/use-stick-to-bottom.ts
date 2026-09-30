@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SCROLL_THRESHOLD_PX } from "@/lib/chat/config";
 
 /** True when the view is within `threshold` px of the bottom, or the content does not overflow. */
@@ -114,6 +114,16 @@ export function useStickToBottom(): StickToBottom {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [scrollElement, setFollowing]);
+
+  // While following, the observers pin the view. Scroll anchoring would move it up on a reflow
+  // above it (a question that takes fewer lines after a rotation), and if a script reads the
+  // layout before the next frame, that scroll event reaches onScroll before the resize observer
+  // pins, reading as a scroll up. So anchoring is off while following, and back on while the
+  // visitor reads above the bottom, where it keeps their place (spec §14 A-22).
+  useLayoutEffect(() => {
+    if (scrollElement === null) return;
+    scrollElement.style.setProperty("overflow-anchor", isFollowing ? "none" : "auto");
+  }, [scrollElement, isFollowing]);
 
   useEffect(() => {
     if (scrollElement === null || contentElement === null) return;
