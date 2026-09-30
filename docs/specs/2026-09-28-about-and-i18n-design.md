@@ -65,7 +65,7 @@ Decision references:
 | Base item | Change | Tag |
 |---|---|---|
 | D-chat-1 "Everything in English" (the UI part) | The UI gets pt-BR as an option. The README, docs and commits stay English. | [D-chat-2] |
-| Template D-sec1 "no i18n" | Waived for this project only. The template itself does not change. | [D-chat-2] |
+| Template D-sec1 "no i18n" | Waived for this project only. The template itself does not change. Superseded 2026-09-30 by X-01: the template now carries the shell and i18n, at `d333861`; this repo keeps its own copy. | [D-chat-2; D: X-01 Q5, 2026-09-29] |
 | D-S-02 empty state (4 prompts) | Two groups of 4: the original 4 under "Try streaming", plus 4 "about" prompts. | [D-chat-2] |
 | D-S-05 limit banner "shows the server's text" | The client shows the limit text in the selected language. The 429 body stays English, as the API contract. | [D: T-02] |
 | D-S-01 system instructions | They gain the profile and new rules (§3). Plain text and 150–250 words are unchanged. | [D-chat-2] |
