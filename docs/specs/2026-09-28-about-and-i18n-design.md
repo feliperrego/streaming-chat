@@ -383,6 +383,21 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 - The new median is above 1500 ms, so base §10's trigger for the server-side TTFT split ("Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | The observability portfolio project starts, or a client median TTFT above 1500 ms") fired. Felipe decides what to do [T-25]; his answer is recorded below.
 - **Felipe's answer** (2026-09-29, "a") [D: T-25]: defer the split again, to the observability project, #12 "Call tracing" in `portfolio/ROADMAP.md` (a dashboard of every model call with tokens, cost and latency). New trigger: when #12 starts. Base §10's row is updated to say so.
 
+### Fixes carried over from X-01 (2026-09-30) [F]
+
+- X-01 moved the chat shell and i18n into the template (§2). Its work found four defects in the chat code this repo shares with the template, and Felipe approved carrying the fixes over by hand ("aplica", 2026-09-30; template spec §14 "Pending") [D]. Each fix is its own commit, with its tests seen failing first:
+
+  | Defect | Commit here | Template commit |
+  |---|---|---|
+  | A stop gesture (PageUp, an upward wheel, a touch move) undone by the last pin's queued scroll event | "fix(chat): keep a stop gesture from being undone by a queued scroll" | `f5a6b86` |
+  | A rotation that rewraps the text above moved a followed view up (scroll anchoring) | "fix(chat): keep a followed view pinned when a rotation rewraps the text above" | `e2b5bad` |
+  | A follow-up after an answer longer than 6000 characters got a 400 that Retry repeated | "fix(chat): cut a long assistant text in the history instead of a 400" | `df1a2d8` |
+  | New chat at the 20-message cap left the focus on its own button | "fix(chat): focus the composer after New chat at the message cap" | `df1a2d8` |
+
+- Base §14 A-22 records what each fix changes in the base spec, and the tests that pin it.
+- Every CI gate passed before each commit, run as `.github/workflows/ci.yml` runs them. After the last fix: 264 Vitest tests and 47 Playwright tests, on one worker.
+- Not carried over: the template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It stays open for Felipe to decide; trigger: his review of these fixes.
+
 ## 10. Proposals and answers
 
 **Approved on 2026-09-28** ("todas ok"): T-01 pt-BR wording · T-02 limit banner translated on the client · T-04 static English page, flash accepted · T-05 profile English only · T-07 demo group first · T-09 re-measure on a later day, keeping both files. T-03, T-06, T-08 and T-10 are reopened below.
