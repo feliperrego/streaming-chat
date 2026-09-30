@@ -11,7 +11,7 @@
 |---|---|
 | `[F]` | Fact, with its source. |
 | `[D]` | Decision taken by Felipe, with a reference. |
-| `[P]` | Proposal, not yet confirmed. None is open; §10 records the answers. |
+| `[P]` | Proposal, not yet confirmed. §10 records the answers and lists the proposals still open, under "Open since". (Until 2026-09-30 this line said none was open; T-28 then opened.) |
 
 Decision references:
 
@@ -385,7 +385,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 
 ### Fixes carried over from X-01 (2026-09-30) [F]
 
-- X-01 moved the chat shell and i18n into the template (§2). Its work found four defects in the chat code this repo shares with the template, and Felipe approved carrying the fixes over by hand ("aplica", 2026-09-30; template spec §14 "Pending") [D]. Each fix is its own commit, with its tests seen failing first:
+- X-01 moved the chat shell and i18n into the template (§2). Its work found four defects in the chat code this repo shares with the template, and Felipe approved carrying the fixes over by hand ("aplica", 2026-09-30; template spec §14 "Pending") [D]. Each fix is its own commit, and each has at least one test seen failing before it [F: local runs, 2026-09-30]. Not every check did: the rotation test's timing read failed 5 of 10 runs before its fix, and the focus check after New chat below the cap is a regression pin that passed before its fix too [F: the same runs]. (Corrected 2026-09-30: this line first said every fix's tests were seen failing first.)
 
   | Defect | Commit here | Template commit |
   |---|---|---|
@@ -395,14 +395,26 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
   | New chat at the 20-message cap left the focus on its own button | "fix(chat): focus the composer after New chat at the message cap" | `df1a2d8` |
 
 - Base §14 A-22 records what each fix changes in the base spec, and the tests that pin it.
-- Every CI gate passed before each commit, run as `.github/workflows/ci.yml` runs them. After the last fix: 264 Vitest tests and 47 Playwright tests, on one worker.
-- Not carried over: the template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It stays open for Felipe to decide; trigger: his review of these fixes.
+- A follow-up commit, "fix(chat): tighten the carried-over tests and records", changes tests and these records only:
+  - The rotation test now also checks, before it rotates, that the view overflows and that the scroll container's computed `overflow-anchor` is `none` while following. With the hook's `useLayoutEffect` removed, it failed at that check in 1 of 1 run, and passed with it restored [F: local runs, 2026-09-30]. That check does not depend on timing, unlike the read after the resize (base A-22 item 2).
+  - The long-answer describe is renamed "8. a follow-up after an answer longer than MAX_ASSISTANT_CHARS" and sits with the failure-mode tests. Its first name, "4. …", came from the template; in base §8.3, 4 is "Regenerate after an answer".
+- Every CI gate passed before each commit, run as `.github/workflows/ci.yml` runs them. After the last fix: 264 Vitest tests and 47 Playwright tests, on one worker. The follow-up commit adds checks to an existing test and moves a describe, and its gate run showed the same totals [F: local run, 2026-09-30].
+- Not carried over:
+  - **The cap placeholder.** The template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It stays open as **T-28** (§10) for Felipe to decide; trigger: his review of these fixes.
+  - **Two template e2e tests:** "a double-click on Send sends once, and its second click does not stop the answer" and "touch: a rotation or a smaller view keeps a followed answer at the bottom".
+    - Why: the carry-over ported each fix with the tests that pin it, and these two pin none of the four fixes. They guard behaviour this repo already had, which the fixes leave unchanged [F: `git diff main` shows no change to `components/chat/composer.tsx` or to the hook's observers]:
+      - the Stop button ignoring the second click of a double-click (`event.detail > 1` in `composer.tsx`, base A-14);
+      - the resize observer on the scroll element, which keeps a followed view at the bottom when the view gets smaller.
+    - What that leaves uncovered here: no e2e double-clicks Send [F: `git grep` in `e2e/`]. The rotation test resizes the view, but the content rewraps too, so the content's observer alone may keep that test green if the scroll element stops being observed [P: not run that way].
+    - Trigger: the first change to `composer.tsx`'s Stop handler, or to the hook's observers in `hooks/use-stick-to-bottom.ts`. That change ports the matching template test and sees it fail with its guard removed before it lands.
 
 ## 10. Proposals and answers
 
 **Approved on 2026-09-28** ("todas ok"): T-01 pt-BR wording · T-02 limit banner translated on the client · T-04 static English page, flash accepted · T-05 profile English only · T-07 demo group first · T-09 re-measure on a later day, keeping both files. T-03, T-06, T-08 and T-10 are reopened below.
 
-**Approved on 2026-09-28 after the review** ("todas ok"). T-13 took the proposed wording ("in web development since 2010").
+**Approved on 2026-09-28 after the review** ("todas ok"): T-11..T-27. T-13 took the proposed wording ("in web development since 2010").
+
+**Open since 2026-09-30:** T-28, added with the X-01 carry-over (§9). Answer with its letter, for example "T-28: a".
 
 | ID | Proposal | Section |
 |---|---|---|
@@ -423,3 +435,4 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 | T-25 | Re-defer the larger measurement infrastructure with a new trigger; a median above 1500 ms goes to Felipe. | 7 |
 | T-26 | Two triggers. The English flash is revisited if the phone check with `?lang=pt-BR` or a visitor finds it noticeable (then: a blocking inline script before first paint). Browser-language detection is added if a visitor with a Portuguese browser reports landing in English, or if Felipe starts sharing the demo mainly with Brazilian recruiters. | 1, 4.2 |
 | T-27 | The success criteria (§1) and the individual test cases (§6) as rewritten. Replaces T-10. | 1, 6 |
+| T-28 | **Open.** At the 20-message cap, a draft typed while the answer that reaches the cap streams hides the cap placeholder, and disabling the composer drops the focus (the X-01 final review). (a) Leave as is until #6's design. (b) Show the cap text as visible text tied to the composer by `aria-describedby`. Recommended: (a) [P]: the template's shell behaves the same, and #6, the next chat project, is where that shell changes next, so a fix here alone would make this copy diverge. Trigger to answer: Felipe's review of the X-01 fixes. | 9 |

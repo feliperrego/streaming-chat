@@ -324,63 +324,6 @@ test("4. Regenerate re-sends only the user turn and shows one answer with a fres
   await expect(regenerateButtons(page)).toHaveCount(1);
 });
 
-// The client posts every earlier answer again. An answer can be longer than MAX_ASSISTANT_CHARS:
-// the mock's [[slow]] answer (300 lines, ignoring the token cap), a [[slow]] answer stopped past
-// the limit, or a real answer cut at the token cap above the limit's characters per token. The
-// next message must still get an answer, not a 400 that Retry would post again (spec §14 A-22).
-test.describe("4. a follow-up after an answer longer than MAX_ASSISTANT_CHARS", () => {
-  /** Sends a follow-up to the real route and expects the default answer as the second answer. */
-  async function expectFollowUpAnswered(page: Page): Promise<void> {
-    const followUp = "And a short follow-up";
-    const body = await postedBody(page, () => sendText(page, followUp));
-    // The input: the posted history carries the long answer whole.
-    expect(body.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
-    expect(postedText(body.messages[1]).length).toBeGreaterThan(MAX_ASSISTANT_CHARS);
-
-    await waitForAnswers(page, 2);
-    await expect(banner(page)).toHaveCount(0);
-    await expect(answerText(assistantBubbles(page).nth(1))).toHaveText(FULL_DEFAULT_ANSWER);
-    await expect(userBubbles(page)).toHaveCount(2);
-    await expect(userBubbles(page).nth(1)).toHaveText(followUp);
-  }
-
-  test("a completed [[slow]] answer", async ({ page }) => {
-    await page.goto("/");
-    await sendText(page, SLOW_PROMPT);
-    await waitForAnswers(page);
-    await expectFollowUpAnswered(page);
-  });
-
-  test("a [[slow]] answer stopped past MAX_ASSISTANT_CHARS", async ({ page }) => {
-    await page.goto("/");
-    await sendText(page, SLOW_PROMPT);
-    const bubble = assistantBubbles(page);
-    await expect
-      .poll(() => textLength(bubble), { timeout: 15_000 })
-      .toBeGreaterThan(MAX_ASSISTANT_CHARS);
-    await stopButton(page).click();
-    await expect(bubble.getByText("Stopped", { exact: true })).toBeVisible();
-    await expectFollowUpAnswered(page);
-  });
-
-  test("an answer cut at the length limit past MAX_ASSISTANT_CHARS", async ({ page }) => {
-    await page.goto("/");
-    const longAnswer = "A long answer that runs on. ".repeat(
-      Math.ceil(MAX_ASSISTANT_CHARS / 28) + 10,
-    );
-    await page.route("**/api/chat", (route) =>
-      fulfillSse(route, textAnswer(longAnswer.trim(), "length")),
-    );
-    await sendText(page, "write 5000 words");
-    await waitForAnswers(page);
-    await expect(
-      assistantBubbles(page).getByText("Cut at demo length limit", { exact: true }),
-    ).toBeVisible();
-    await page.unroute("**/api/chat");
-    await expectFollowUpAnswered(page);
-  });
-});
-
 test.describe("5. autoscroll", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
@@ -907,8 +850,11 @@ test.describe("8. failure modes", () => {
     // moves the view up by the lines saved, and if a script reads the layout before the next
     // frame, that scroll event reaches the hook before the resize observer pins the view, so
     // following stops. The hook turns anchoring off while following (spec §14 A-22), so the view
-    // never moves up. The resize is sent through CDP together with the read, so the read lands
-    // before the frame.
+    // never moves up. Two checks pin that. First, the scroll container's computed overflow-anchor
+    // is "none" while following. This check does not depend on timing: without the fix the value
+    // is the default "auto". Then the timing check: the resize is sent through CDP together with
+    // the read, so the read lands before the frame. When the read lands before the resize is
+    // applied, it sees no move, so this check alone misses a regression in some runs.
     test("touch: a rotation never moves a followed view up", async ({ page }) => {
       await page.goto("/");
       await composer(page).tap();
@@ -917,8 +863,14 @@ test.describe("8. failure modes", () => {
       );
       await sendButton(page).tap();
       await waitUntilIdle(page);
+      // Only a view that overflows has anything above it to anchor to.
+      await expect.poll(async () => (await scrollState(page)).overflow).toBeGreaterThan(400);
       await expect.poll(() => distanceFromBottom(page)).toBeLessThanOrEqual(2);
       const before = (await scrollState(page)).scrollTop;
+      expect(
+        await scroller(page).evaluate((element) => getComputedStyle(element).overflowAnchor),
+        "scroll anchoring is off while following",
+      ).toBe("none");
 
       await scroller(page).evaluate((element) => {
         (window as unknown as { scroller: Element }).scroller = element;
@@ -945,5 +897,63 @@ test.describe("8. failure modes", () => {
         .toBeLessThanOrEqual(2);
       await expect(jumpButton(page)).toHaveCount(0);
     });
+  });
+});
+
+// The client posts every earlier answer again. An answer can be longer than MAX_ASSISTANT_CHARS:
+// the mock's [[slow]] answer (300 lines, ignoring the token cap), a [[slow]] answer stopped past
+// the limit, or a real answer cut at the token cap above the limit's characters per token. The
+// next message must still get an answer, not a 400 that Retry would post again (spec §14 A-22).
+// Numbered 8, like the other failure-mode additions to spec §8.3 (spec §14 A-18).
+test.describe("8. a follow-up after an answer longer than MAX_ASSISTANT_CHARS", () => {
+  /** Sends a follow-up to the real route and expects the default answer as the second answer. */
+  async function expectFollowUpAnswered(page: Page): Promise<void> {
+    const followUp = "And a short follow-up";
+    const body = await postedBody(page, () => sendText(page, followUp));
+    // The input: the posted history carries the long answer whole.
+    expect(body.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
+    expect(postedText(body.messages[1]).length).toBeGreaterThan(MAX_ASSISTANT_CHARS);
+
+    await waitForAnswers(page, 2);
+    await expect(banner(page)).toHaveCount(0);
+    await expect(answerText(assistantBubbles(page).nth(1))).toHaveText(FULL_DEFAULT_ANSWER);
+    await expect(userBubbles(page)).toHaveCount(2);
+    await expect(userBubbles(page).nth(1)).toHaveText(followUp);
+  }
+
+  test("a completed [[slow]] answer", async ({ page }) => {
+    await page.goto("/");
+    await sendText(page, SLOW_PROMPT);
+    await waitForAnswers(page);
+    await expectFollowUpAnswered(page);
+  });
+
+  test("a [[slow]] answer stopped past MAX_ASSISTANT_CHARS", async ({ page }) => {
+    await page.goto("/");
+    await sendText(page, SLOW_PROMPT);
+    const bubble = assistantBubbles(page);
+    await expect
+      .poll(() => textLength(bubble), { timeout: 15_000 })
+      .toBeGreaterThan(MAX_ASSISTANT_CHARS);
+    await stopButton(page).click();
+    await expect(bubble.getByText("Stopped", { exact: true })).toBeVisible();
+    await expectFollowUpAnswered(page);
+  });
+
+  test("an answer cut at the length limit past MAX_ASSISTANT_CHARS", async ({ page }) => {
+    await page.goto("/");
+    const longAnswer = "A long answer that runs on. ".repeat(
+      Math.ceil(MAX_ASSISTANT_CHARS / 28) + 10,
+    );
+    await page.route("**/api/chat", (route) =>
+      fulfillSse(route, textAnswer(longAnswer.trim(), "length")),
+    );
+    await sendText(page, "write 5000 words");
+    await waitForAnswers(page);
+    await expect(
+      assistantBubbles(page).getByText("Cut at demo length limit", { exact: true }),
+    ).toBeVisible();
+    await page.unroute("**/api/chat");
+    await expectFollowUpAnswered(page);
   });
 });
