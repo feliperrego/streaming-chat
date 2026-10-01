@@ -425,7 +425,7 @@ The caveats to condense into that sentence:
 
 **Discarded alternatives for decision 2:**
 
-- **Server-side first-chunk time.** It hides network and function overhead, which flatters the number. It belongs to the observability portfolio project (#12 in the D-chat-1 list).
+- **Server-side first-chunk time.** It hides network and function overhead, which flatters the number. It belongs to the observability portfolio project (#12 in the D-chat-1 list). Remapped 2026-10-01: the roadmap's old #12 became a trace panel in each new project, with no observability project of its own (ROADMAP) [D: Q2, 2026-10-01]; §10 holds the split's trigger.
 - **A Node SSE script with a one-word prompt.** It excludes rendering, minimises prefill, and would be a second instrument that disagrees with the live caption.
 
 **The live caption** uses the same code path as the README number, so the demo and the README cannot disagree.
@@ -606,7 +606,7 @@ Also exercised in production: an AI Gateway refusal (403) before any chunk retur
 | RAG, tools, evals, observability dashboard, prompt-injection suite, model picker or routing | Separate portfolio projects [D-chat-1] |
 | Auth, DB, persistence, history, share links, resumable streams | Not in this project ("Nothing else goes in" [D-chat-1]). Resume is also incompatible with abort [F: v7 check]. |
 | Markdown rendering (Streamdown / react-markdown), code highlighting | More than 1 in 10 manual demo answers show raw Markdown |
-| Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | The observability portfolio project (#12, call tracing) starts. (The second trigger, a client median above 1500 ms, fired on 2026-09-29 at 1529 ms; Felipe deferred the split to #12 [D: T-25, delta spec §9].) |
+| Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | A new portfolio project has latency as its headline [P: delta spec T-29]. Remapped 2026-10-01: the roadmap's old #12 became a trace panel in each new project (ROADMAP) [D: Q2, 2026-10-01], so the trigger this cell held until then, "The observability portfolio project (#12, call tracing) starts", can no longer fire. (The second trigger, a client median above 1500 ms, fired on 2026-09-29 at 1529 ms; Felipe deferred the split to #12 [D: T-25, delta spec §9].) |
 | A before/after deploy without `supportsCancellation`, for the README | Manual check 1 shows per-request output tokens in the Gateway, and the work is inside its 2-day budget |
 | Larger measurement infrastructure (n ≥ 60, batches, README drift test) | The README number is re-measured a second time |
 | Copy button | All acceptance criteria are met inside the 2-day budget |

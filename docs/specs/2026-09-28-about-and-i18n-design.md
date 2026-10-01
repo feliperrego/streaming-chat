@@ -11,7 +11,7 @@
 |---|---|
 | `[F]` | Fact, with its source. |
 | `[D]` | Decision taken by Felipe, with a reference. |
-| `[P]` | Proposal, not yet confirmed. §10 records the answers. None is open: T-28, opened on 2026-09-30, was answered the same day. (Until 2026-09-30 this line said none was open; T-28 then opened.) |
+| `[P]` | Proposal, not yet confirmed. §10 records the answers. None is open: T-29 and T-30, opened on 2026-10-01 by the roadmap remap (§9), were answered the same day. (Until 2026-10-01 this line said none was open: T-28, opened on 2026-09-30, was answered the same day.) |
 
 Decision references:
 
@@ -381,7 +381,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 - The README's line 1 and first "How it's measured" line are the ones the script printed.
 - The difference is not attributed to the larger instructions: the runs are on different days and at different times of day, with n = 14 each (§7).
 - The new median is above 1500 ms, so base §10's trigger for the server-side TTFT split ("Server-side TTFT split, OpenTelemetry, cold-instance or region tracking | The observability portfolio project starts, or a client median TTFT above 1500 ms") fired. Felipe decides what to do [T-25]; his answer is recorded below.
-- **Felipe's answer** (2026-09-29, "a") [D: T-25]: defer the split again, to the observability project, #12 "Call tracing" in `portfolio/ROADMAP.md` (a dashboard of every model call with tokens, cost and latency). New trigger: when #12 starts. Base §10's row is updated to say so.
+- **Felipe's answer** (2026-09-29, "a") [D: T-25]: defer the split again, to the observability project, #12 "Call tracing" in `portfolio/ROADMAP.md` (a dashboard of every model call with tokens, cost and latency). New trigger: when #12 starts. Base §10's row is updated to say so. Remapped 2026-10-01: the roadmap's old #12 became a trace panel in each new project, and its cross-demo dashboard was dropped (ROADMAP) [D: Q2, 2026-10-01], so "when #12 starts" can no longer fire. The proposed new trigger is a new project with latency as its headline, as in the ROADMAP's entry for #1 [P: T-29]; base §10's row says so.
 
 ### Fixes carried over from X-01 (2026-09-30) [F]
 
@@ -400,7 +400,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
   - The long-answer describe is renamed "8. a follow-up after an answer longer than MAX_ASSISTANT_CHARS" and sits with the failure-mode tests. Its first name, "4. …", came from the template; in base §8.3, 4 is "Regenerate after an answer".
 - Every CI gate passed before each commit, run as `.github/workflows/ci.yml` runs them. After the last fix: 264 Vitest tests and 47 Playwright tests, on one worker. The follow-up commit adds checks to an existing test and moves a describe, and its gate run showed the same totals [F: local run, 2026-09-30].
 - Not carried over:
-  - **The cap placeholder.** The template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It was recorded as **T-28** (§10), and Felipe answered (a) on 2026-09-30: it stays as is until #6's design [D: T-28].
+  - **The cap placeholder.** The template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It was recorded as **T-28** (§10), and Felipe answered (a) on 2026-09-30: it stays as is until #6's design [D: T-28]. Remapped 2026-10-01: the roadmap's old #6 became P2 (ROADMAP) [D: Q2, 2026-10-01], but the next project with a chat is now P1, and X-02 moves the shell P1 builds into the template [D: Q3, Q7, 2026-10-01]; T-30 proposes reading this trigger as P1's design [P].
   - **Two template e2e tests:** "a double-click on Send sends once, and its second click does not stop the answer" and "touch: a rotation or a smaller view keeps a followed answer at the bottom".
     - Why: the carry-over ported each fix with the tests that pin it, and these two pin none of the four fixes. They guard behaviour this repo already had, which the fixes leave unchanged [F: `git diff main` shows no change to `components/chat/composer.tsx` or to the hook's observers]:
       - the Stop button ignoring the second click of a double-click (`event.detail > 1` in `composer.tsx`, base A-14);
@@ -415,6 +415,8 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 **Approved on 2026-09-28 after the review** ("todas ok"): T-11..T-27. T-13 took the proposed wording ("in web development since 2010").
 
 **Answered on 2026-09-30:** T-28, added with the X-01 carry-over (§9), answered (a) by Felipe ("a").
+
+**Answered on 2026-10-01:** T-29 and T-30, both yes ("ambas ok") [D]. That day Felipe replaced the roadmap's 14 items with four projects, P1–P4 (`portfolio/ROADMAP.md`) [D: Q1, Q2, 2026-10-01], so the two triggers here that named an old item (#12 in T-25's answer, #6 in T-28's) need a new target (§9).
 
 | ID | Proposal | Section |
 |---|---|---|
@@ -435,4 +437,6 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 | T-25 | Re-defer the larger measurement infrastructure with a new trigger; a median above 1500 ms goes to Felipe. | 7 |
 | T-26 | Two triggers. The English flash is revisited if the phone check with `?lang=pt-BR` or a visitor finds it noticeable (then: a blocking inline script before first paint). Browser-language detection is added if a visitor with a Portuguese browser reports landing in English, or if Felipe starts sharing the demo mainly with Brazilian recruiters. | 1, 4.2 |
 | T-27 | The success criteria (§1) and the individual test cases (§6) as rewritten. Replaces T-10. | 1, 6 |
-| T-28 | **Answered (a), 2026-09-30** [D]. At the 20-message cap, a draft typed while the answer that reaches the cap streams hides the cap placeholder, and disabling the composer drops the focus (the X-01 final review). (a) Leave as is until #6's design. (b) Show the cap text as visible text tied to the composer by `aria-describedby`. Recommended: (a) [P]: the template's shell behaves the same, and #6, the next chat project, is where that shell changes next, so a fix here alone would make this copy diverge. Trigger to answer: Felipe's review of the X-01 fixes. | 9 |
+| T-28 | **Answered (a), 2026-09-30** [D]. At the 20-message cap, a draft typed while the answer that reaches the cap streams hides the cap placeholder, and disabling the composer drops the focus (the X-01 final review). (a) Leave as is until #6's design. (b) Show the cap text as visible text tied to the composer by `aria-describedby`. Recommended: (a) [P]: the template's shell behaves the same, and #6, the next chat project, is where that shell changes next, so a fix here alone would make this copy diverge. Trigger to answer: Felipe's review of the X-01 fixes. Remapped 2026-10-01: the roadmap's old #6 became P2 (ROADMAP); T-30 proposes P1's design as the trigger for (a). | 9 |
+| T-29 | **Answered yes, 2026-10-01** [D] ("ambas ok"). T-25's deferred split (server-side TTFT, OpenTelemetry, cold-instance or region tracking) gets the trigger "a new project has latency as its headline", as the ROADMAP's entry for #1 proposes. The answer's trigger, "when #12 starts", cannot fire: #12 became a trace panel in each new project, and its cross-demo dashboard was dropped [D: Q2, 2026-10-01]. | 9; base §10 |
+| T-30 | **Answered yes, 2026-10-01** [D] ("ambas ok"). T-28's answer (a) holds until P1's design. The answer said "until #6's design", for the reason that #6 was the next chat project, where the template's shell changes next. #6 became P2 [D: Q2, 2026-10-01], but P1 comes first and X-02 moves the shell P1 builds, the chat in a panel included, into the template [D: Q3, Q7, 2026-10-01], so that shell now changes next at P1. Alternative: P2's design, the item that took #6's place. | 9 |
