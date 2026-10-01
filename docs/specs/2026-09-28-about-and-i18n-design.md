@@ -11,7 +11,7 @@
 |---|---|
 | `[F]` | Fact, with its source. |
 | `[D]` | Decision taken by Felipe, with a reference. |
-| `[P]` | Proposal, not yet confirmed. §10 records the answers and lists the proposals still open, under "Open since". (Until 2026-09-30 this line said none was open; T-28 then opened.) |
+| `[P]` | Proposal, not yet confirmed. §10 records the answers. None is open: T-28, opened on 2026-09-30, was answered the same day. (Until 2026-09-30 this line said none was open; T-28 then opened.) |
 
 Decision references:
 
@@ -400,7 +400,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
   - The long-answer describe is renamed "8. a follow-up after an answer longer than MAX_ASSISTANT_CHARS" and sits with the failure-mode tests. Its first name, "4. …", came from the template; in base §8.3, 4 is "Regenerate after an answer".
 - Every CI gate passed before each commit, run as `.github/workflows/ci.yml` runs them. After the last fix: 264 Vitest tests and 47 Playwright tests, on one worker. The follow-up commit adds checks to an existing test and moves a describe, and its gate run showed the same totals [F: local run, 2026-09-30].
 - Not carried over:
-  - **The cap placeholder.** The template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It stays open as **T-28** (§10) for Felipe to decide; trigger: his review of these fixes.
+  - **The cap placeholder.** The template's final X-01 review also found that a draft typed while the answer that reaches the cap streams hides the cap placeholder, and that disabling the composer drops the focus. It names #1 as behaving the same and leaves the decision to #1's hand-fix [F: template spec §14, "Minor findings of the X-01 final review"]. These fixes do not change it. The review suggests showing the cap text as visible text tied to the composer by `aria-describedby`. It was recorded as **T-28** (§10), and Felipe answered (a) on 2026-09-30: it stays as is until #6's design [D: T-28].
   - **Two template e2e tests:** "a double-click on Send sends once, and its second click does not stop the answer" and "touch: a rotation or a smaller view keeps a followed answer at the bottom".
     - Why: the carry-over ported each fix with the tests that pin it, and these two pin none of the four fixes. They guard behaviour this repo already had, which the fixes leave unchanged [F: `git diff main` shows no change to `components/chat/composer.tsx` or to the hook's observers]:
       - the Stop button ignoring the second click of a double-click (`event.detail > 1` in `composer.tsx`, base A-14);
@@ -414,7 +414,7 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 
 **Approved on 2026-09-28 after the review** ("todas ok"): T-11..T-27. T-13 took the proposed wording ("in web development since 2010").
 
-**Open since 2026-09-30:** T-28, added with the X-01 carry-over (§9). Answer with its letter, for example "T-28: a".
+**Answered on 2026-09-30:** T-28, added with the X-01 carry-over (§9), answered (a) by Felipe ("a").
 
 | ID | Proposal | Section |
 |---|---|---|
@@ -435,4 +435,4 @@ Task 10, with Felipe's OK ("ok", 2026-09-29), from the same location string as t
 | T-25 | Re-defer the larger measurement infrastructure with a new trigger; a median above 1500 ms goes to Felipe. | 7 |
 | T-26 | Two triggers. The English flash is revisited if the phone check with `?lang=pt-BR` or a visitor finds it noticeable (then: a blocking inline script before first paint). Browser-language detection is added if a visitor with a Portuguese browser reports landing in English, or if Felipe starts sharing the demo mainly with Brazilian recruiters. | 1, 4.2 |
 | T-27 | The success criteria (§1) and the individual test cases (§6) as rewritten. Replaces T-10. | 1, 6 |
-| T-28 | **Open.** At the 20-message cap, a draft typed while the answer that reaches the cap streams hides the cap placeholder, and disabling the composer drops the focus (the X-01 final review). (a) Leave as is until #6's design. (b) Show the cap text as visible text tied to the composer by `aria-describedby`. Recommended: (a) [P]: the template's shell behaves the same, and #6, the next chat project, is where that shell changes next, so a fix here alone would make this copy diverge. Trigger to answer: Felipe's review of the X-01 fixes. | 9 |
+| T-28 | **Answered (a), 2026-09-30** [D]. At the 20-message cap, a draft typed while the answer that reaches the cap streams hides the cap placeholder, and disabling the composer drops the focus (the X-01 final review). (a) Leave as is until #6's design. (b) Show the cap text as visible text tied to the composer by `aria-describedby`. Recommended: (a) [P]: the template's shell behaves the same, and #6, the next chat project, is where that shell changes next, so a fix here alone would make this copy diverge. Trigger to answer: Felipe's review of the X-01 fixes. | 9 |
